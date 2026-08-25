@@ -44,6 +44,11 @@
     <guilabel>EphemerisFile</guilabel> resource and
     <guilabel>Toggle</guilabel> command.</para>
 
+    <note>
+      <para>The Code-500 ephemeris format is deprecated. Use of CCSDS-OEM is
+      recommended instead.</para>
+    </note>
+
     <para><phrase role="ref_seealso">See Also</phrase>: <xref
     linkend="CoordinateSystem"/>, <xref linkend="Toggle"/></para>
   </refsection>
@@ -66,6 +71,68 @@
         </thead>
 
         <tbody>
+          <row>
+            <entry><guilabel>AccelerationModel</guilabel></entry>
+
+            <entry><para>Assigns an instance of ForceModel to be used when
+            including acceleration records in a CCSDS OEM Version 2 file. This
+            force model is only used for acceleration reporting and is not
+            applied in the propagation of the orbit, which is instead
+            performed by the force model associated with the Propagate
+            command. It is however strongly recommended that, when including
+            acceleration records in a CCSDS OEM Version 2 file, the same force
+            model be used for both the Propagator and
+            AccelerationModel.</para><variablelist>
+                <varlistentry>
+                  <term>Data Type</term>
+
+                  <listitem>
+                    <para>Instance of ForceModel</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Allowed Values</term>
+
+                  <listitem>
+                    <para>Any user-defined ForceModel</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Access</term>
+
+                  <listitem>
+                    <para>Set</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Default Value</term>
+
+                  <listitem>
+                    <para><guilabel>none</guilabel></para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Units</term>
+
+                  <listitem>
+                    <para>N/A</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Interfaces</term>
+
+                  <listitem>
+                    <para>Script</para>
+                  </listitem>
+                </varlistentry>
+              </variablelist></entry>
+          </row>
+
           <row>
             <entry><guilabel>CoordinateSystem</guilabel></entry>
 
@@ -265,9 +332,8 @@
                   <term>Allowed Values</term>
 
                   <listitem>
-                    <para><guilabel>CCSDS-OEM</guilabel>,
-                    <guilabel>SPK</guilabel>, <guilabel>Code-500</guilabel>,
-                    <guilabel>STK-TimePosVel</guilabel></para>
+                    <para><guilabel>CCSDS-OEM, SPK, Code-500,
+                    STKTimePosVel</guilabel></para>
                   </listitem>
                 </varlistentry>
 
@@ -299,7 +365,7 @@
                   <term>Interfaces</term>
 
                   <listitem>
-                    <para>GUI, script</para>
+                    <para>GUI, Script</para>
                   </listitem>
                 </varlistentry>
               </variablelist></entry>
@@ -422,15 +488,74 @@
           </row>
 
           <row>
+            <entry><guilabel>FormatVersion</guilabel></entry>
+
+            <entry><para>The format version for CCSDS OEM file generation.
+            Must be set to 2.0 to generate a CCSDS OEM including covariance
+            and/or acceleration records.</para><variablelist>
+                <varlistentry>
+                  <term>Data Type</term>
+
+                  <listitem>
+                    <para>Numeric</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Allowed Values</term>
+
+                  <listitem>
+                    <para><guilabel>1.0, 2.0</guilabel></para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Access</term>
+
+                  <listitem>
+                    <para>Set</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Default Value</term>
+
+                  <listitem>
+                    <para><literal>1.0</literal></para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Units</term>
+
+                  <listitem>
+                    <para>N/A</para>
+                  </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                  <term>Interfaces</term>
+
+                  <listitem>
+                    <para>GUI, Script</para>
+                  </listitem>
+                </varlistentry>
+              </variablelist></entry>
+          </row>
+
+          <row>
             <entry><guilabel>IncludeCovariance</guilabel></entry>
 
             <entry><para>Flag to optionally include covariance data in the
             output ephemeris, for ephemeris formats that support covariance
-            output. Currently only allowed for
-            <guilabel>STK-TimePosVel</guilabel> ephemeris files. Select
+            output. Only allowed for <guilabel>STK-TimePosVel</guilabel> and
+            <guilabel>CCSDS-OEM</guilabel> (Version 2) ephemeris files. Select
             <guilabel>Position</guilabel> to output only position covariance
             values. Select <guilabel>PositionAndVelocity</guilabel> to output
-            position and velocity covariance values.</para><variablelist>
+            position and velocity covariance values. CCSDS Version 2 OEM
+            ephemeris output only supports the
+            <guilabel>PositionAndVelocity</guilabel>
+            option.</para><variablelist>
                 <varlistentry>
                   <term>Data Type</term>
 
@@ -1247,18 +1372,18 @@
       Format Ephemeris Files</title>
 
       <para>If the selected <guilabel>CoordinateSystem</guilabel> uses
-      MJ2000Eq axes, the CCSDS ephemeris file contains “EME2000” for the
+      MJ2000Eq axes, the CCSDS ephemeris file will specify “EME2000” for the
       REF_FRAME according to CCSDS convention. By CCSDS requirements,
-      non-standard axes names are allowed when documented in an ICD. The
-      <guilabel>CoordinateSystems</guilabel> specifications document in the
-      user's guide is the ICD for all axes supported by GMAT. If you create a
-      new coordinate system whose origin is Luna, then the CCSDS ephemeris
-      file contains “Moon” for the CENTER_NAME.</para>
+      non-standard axes names are allowed when documented in an ICD. If you
+      create a new coordinate system whose origin is Luna, GMAT will use
+      “MOON” for the CENTER_NAME in any CCSDS-OEM ephemeris file. Writing a
+      CCSDS OEM (Version 2) including covariance is restricted to MJ2000Eq
+      axes, but any central body is permitted. </para>
 
       <para>For Code-500 file format, GMAT can write ephemeris for a
       CoordinateSystem under <guilabel>CoordinateSystem</guilabel> field that
-      references a MJ2000Eq, BodyFixed, or TOD axis for any central body.
-      </para>
+      references a MJ2000Eq, BodyFixed, or TOD axis for any central
+      body.</para>
 
       <para>For the SPK file format, GMAT can only write an ephemeris for a
       coordinate system under <guilabel>CoordinateSystem</guilabel> field that
@@ -1268,10 +1393,10 @@
 
       <para>There is one important difference between GMAT and IAU
       conventions. By IAU convention, there is no name for the IAU2000 axes
-      that is independent of the origin. GCRF is coordinate system centered at
-      earth with IAU2000 axes, and ICRF is a coordinate system centered at the
-      solar system barycenter with IAU2000 axes. We have chosen to name the
-      IAU2000 axes ICRF regardless of the origin. Please refer to
+      that are independent of the origin. GCRF is coordinate system centered
+      at earth with IAU2000 axes, and ICRF is a coordinate system centered at
+      the solar system barycenter with IAU2000 axes. We have chosen to name
+      the IAU2000 axes ICRF regardless of the origin. Please refer to
       <guilabel>CoordinateSystems</guilabel> specifications document to read
       more about built-in coordinate systems and description of Axes types
       that GMAT supports.</para>
@@ -1323,8 +1448,8 @@
       <para>When generating an ephemeris file for a mission sequence, GMAT
       separately interpolates ephemeris segments that are bounded by
       discontinuous or discrete mission events. Discontinuous or discrete
-      mission sequence events can range from impulsive or finite-burn
-      maneuvers, changes in dynamics models or when using assignment commands.
+      mission sequence events can be impulsive or finite-burn maneuvers or
+      changes in dynamics models or when using assignment commands.
       Furthermore, when a mission sequence employs iterative processes such as
       differential correction or optimization, GMAT only writes the ephemeris
       for the final solution from the iterative processes. See the <xref
@@ -1392,34 +1517,37 @@
 
       <para>For CCSDS file formats, whenever there is not enough raw data
       available to support the requested interpolation type and order, GMAT
-      throws an error message and stops interpolation. GMAT still generates
-      the ephemeris file but no spacecraft ephemeris data is written to the
-      file and only the file’s Header section will be there. Within the Header
-      section and under COMMENT, a message will be thrown saying that not
-      enough raw data is available to generate spacecraft ephemeris data at
-      the requested interpolation order.</para>
+      will attempt to reduce the interpolation order to generate the requested
+      ephemeris segment. If this is not possible, GMAT throws an error message
+      and stops interpolation. GMAT still generates the ephemeris file but no
+      spacecraft ephemeris data is written to the file and only the file’s
+      header section will be there. Within the header section and under
+      COMMENT, a message will be thrown saying that not enough raw data is
+      available to generate spacecraft ephemeris data at the requested
+      interpolation order.</para>
 
       <para>For SPK file formats, raw data is always collected at every
       integrator step for each segment and then sent to SPK kernel writer.
-      GMAT does not perform any interpolation for SPK files as SPK contains
-      its own interpolation. As a result, <guilabel>InitialEpoch</guilabel>
-      and <guilabel>FinalEpoch</guilabel> fields behave differently for SPK
-      ephemerides. The first epoch on the file is the first step after
-      <guilabel>InitialEpoch</guilabel>. The last epoch on the file is the
-      last step before <guilabel>FinalEpoch.</guilabel></para>
+      GMAT does not perform any interpolation for SPK files as the SPICE
+      toolkit contains its own interpolation. As a result,
+      <guilabel>InitialEpoch</guilabel> and <guilabel>FinalEpoch</guilabel>
+      fields behave differently for SPK ephemerides. The first epoch on the
+      file is the first step after <guilabel>InitialEpoch</guilabel>. The last
+      epoch on the file is the last step before
+      <guilabel>FinalEpoch.</guilabel></para>
 
-      <para>For code 500 file formats, you can set the interpolation order and
-      currently GMAT supports Lagrange as the available interpolator method.
-      For code 500 file formats, if there is not enough raw data available to
-      support interpolation type and order, GMAT will throw an error message
-      and stop interpolation.</para>
+      <para>For Code 500 files, you can set the interpolation order and
+      currently GMAT supports Lagrange as the available interpolation method.
+      For Code 500 files, if there is not enough raw data available to support
+      interpolation type and order, GMAT will throw an error message and stop
+      interpolation.</para>
 
       <para>For the STK-TimePosVel ephemeris format, whenever there is not
       enough raw data available to support the generation of ephemeris at the
       requested interpolation order and fixed step size, GMAT will internally
       adjust the interpolation order such that at least the beginning and the
-      last ephemeris points are reported in the STK .e ephemeris file. This
-      new interpolation order will be reported at STK . e ephemeris's header
+      last ephemeris points are reported in the STK ephemeris file. This new
+      interpolation order will be reported in the STK ephemeris's header
       data.</para>
     </refsection>
 
@@ -1427,20 +1555,21 @@
       <title>Behavior When Using EphemerisFile Resource &amp; Toggle
       Command</title>
 
-      <para><guilabel>EphemerisFile</guilabel> resource generates ephemeris
-      file at each propagation step of the entire mission duration. If you
-      want to generate ephemeris data during specific points in your mission,
-      then a <guilabel>Toggle</guilabel> <guilabel>On/Off</guilabel> command
-      can be inserted into the <guilabel>Mission</guilabel> tree to control
-      when the <guilabel>EphemerisFile </guilabel>resource writes data. When
-      <guilabel>Toggle</guilabel> <guilabel>Off</guilabel> command is issued
-      for an <guilabel>EphemerisFile</guilabel> subscriber, no data is sent to
-      a file until a <guilabel>Toggle</guilabel> <guilabel>On</guilabel>
-      command is issued. Similarly, when a <guilabel>Toggle</guilabel>
-      <guilabel>On</guilabel> command is used, ephemeris data is sent to a
-      file at each integration step until a <guilabel>Toggle</guilabel> Off
-      command is used. The Toggle command can be used on all four ephemeris
-      types that GMAT supports.</para>
+      <para>The <guilabel>EphemerisFile</guilabel> resource generates
+      ephemeris data at each propagation step of the entire mission duration.
+      If you want to generate ephemeris data during specific segments of your
+      mission, a <guilabel>Toggle</guilabel> <guilabel>On/Off</guilabel>
+      command can be inserted into the <guilabel>Mission</guilabel> tree to
+      control when the <guilabel>EphemerisFile </guilabel>resource writes
+      data. When <guilabel>Toggle</guilabel> <guilabel>Off</guilabel> command
+      is issued for an <guilabel>EphemerisFile</guilabel> subscriber, no data
+      is sent to a file until a <guilabel>Toggle</guilabel>
+      <guilabel>On</guilabel> command is issued. Similarly, when a
+      <guilabel>Toggle</guilabel> <guilabel>On</guilabel> command is used,
+      ephemeris data is sent to a file at each integration step until a
+      <guilabel>Toggle</guilabel> <guilabel>Off</guilabel> command is used.
+      The Toggle command can be used on all four ephemeris types that GMAT
+      supports.</para>
 
       <para>Below is an example script snippet that shows how to use
       <guilabel>Toggle Off/On</guilabel> commands while using the
@@ -1485,24 +1614,24 @@ EndFileThrust ThrustHistory(Sat);</code></programlisting>
       <title>Behavior of Code 500 Ephemeris File During Discontinuous &amp;
       Iterative Processes</title>
 
-      <para>Code 500 ephemeris file follows the ephemeris format and
+      <para>Code 500 ephemeris files follow the ephemeris format and
       definitions that have been defined in <emphasis>Flight Dynamics Division
       (FDD) Generic Data Product Formats Interface Control
       Document</emphasis>.</para>
 
-      <para>Unlike CCSDS ephemeris file, the code 500 ephemeris format does
+      <para>Unlike CCSDS ephemeris file, the Code 500 ephemeris format does
       not support separate chunks in the data blocks whenever discontinuous or
-      discrete mission events such as impulsive/finite maneuvers, change in
-      dynamics or assignment command takes place. Rather, the code 500
+      discrete mission events such as impulsive/finite maneuvers or changes in
+      dynamics or assignment command takes place. Rather, the Code 500
       ephemeris is generated all in one continuous data block regardless of
       any number of mission events that may occur between initial and final
       epochs of ephemeris file. Furthermore, when a mission sequence employs
       iterative processes such as differential correction or optimization,
       GMAT will only write the ephemeris for the final solution from the
-      iterative processes. Code 500 ephemeris does not allow non-monotonic
+      iterative processes. The Code 500 ephemeris does not allow non-monotonic
       ephemeris generation and an exception will be thrown if propagation
       direction changes. Furthermore, any discontinuities created by
-      assignments may result in invalid code 500 files.</para>
+      assignments may result in invalid Code 500 files.</para>
     </refsection>
 
     <refsection>
@@ -1516,13 +1645,14 @@ EndFileThrust ThrustHistory(Sat);</code></programlisting>
       fields are optional. GMAT's Code 500 ephemeris header records only
       specifies fields that are mandatory and optional fields have not been
       included. Code 500's ephemeris header record 1 is mandatory while
-      ephemeris record 2 is optional. Complete description of ephemeris format
-      and list of mandatory and optional ephemeris header record parameters is
-      defined in <emphasis>Flight Dynamics Division (FDD) Generic Data Product
-      Formats Interface Control Document</emphasis>. In GMAT, only required
-      fields have been written in header record 1 while header record 2 is
-      left blank. Table below lists header record 1's required fields and any
-      additional comments pertaining to that field.</para>
+      ephemeris record 2 is optional. A complete description of the Code 500
+      ephemeris format, and list of mandatory and optional ephemeris header
+      record parameters is defined in <emphasis>Flight Dynamics Division (FDD)
+      Generic Data Product Formats Interface Control Document</emphasis>. In
+      GMAT, only required fields have been written in header record 1 while
+      header record 2 is left blank. Table below lists header record 1's
+      required fields and any additional comments pertaining to that
+      field.</para>
 
       <informaltable colsep="0" frame="topbot">
         <tgroup cols="2">
@@ -1632,7 +1762,7 @@ EndFileThrust ThrustHistory(Sat);</code></programlisting>
             <row>
               <entry><guilabel>centralBodyIndicator</guilabel></entry>
 
-              <entry><para>Set to central body of corrdinate system. Note GMAT
+              <entry><para>Set to central body of coordinate system. Note GMAT
               allows users to change central body of
               integration.</para></entry>
             </row>
@@ -1857,16 +1987,16 @@ EndFileThrust ThrustHistory(Sat);</code></programlisting>
       </informaltable>
 
       <para>For ephemeris header record 1, there are some required fields that
-      have not been tabulated in GMAT's Code 500 ephemeris header record 1.
+      have not been tabulated in GMAT's Code 500 ephemeris header record.
       These fields that have not been tabulated in header record 1 are listed
       in the table below. 0.0 indicates "used" and 1.0 means "not
       used".</para>
 
       <informaltable colsep="0" frame="topbot">
         <tgroup cols="2">
-          <colspec colnum="1" colwidth="3.5*"/>
+          <colspec colwidth="272*"/>
 
-          <colspec colnum="2" colwidth="3*"/>
+          <colspec colwidth="728*"/>
 
           <thead>
             <row>
@@ -1928,11 +2058,11 @@ EndFileThrust ThrustHistory(Sat);</code></programlisting>
     <title>Examples</title>
 
     <informalexample>
-      <para>This example shows how to generate a simple ephemeris file.
-      Ephemeris file is generated for two days of propagation. At default
-      settings, ephemeris file is generated at each integrator step and in
-      CCSDS file format. Ephemeris data is sent to text file called
-      ‘<literal>EphemerisFile2.eph</literal>’:</para>
+      <para>This example shows how to generate a simple ephemeris file. The
+      ephemeris file is generated for two days of propagation. Using the
+      default settings, the ephemeris file is generated at each integrator
+      step and in CCSDS file format. The ephemeris data is sent to a text file
+      called ‘<literal>EphemerisFile2.eph</literal>’:</para>
 
       <programlisting><code>Create Spacecraft aSat
 Create Propagator aProp
@@ -1950,7 +2080,7 @@ Propagate aProp(aSat) {aSat.ElapsedDays = 2}</code></programlisting>
     <informalexample>
       <para>This example shows how an ephemeris file is generated during an
       iterative process like differential correction that includes a
-      discontinuous event like an impulsive burn. Ephemeris data is sent to
+      discontinuous event like an impulsive burn. Ephemeris data is sent to a
       text file called ‘<literal>EphemerisFile3.eph</literal>’:</para>
 
       <programlisting><code>Create Spacecraft aSat
@@ -1981,7 +2111,7 @@ Propagate aProp(aSat) {aSat.ElapsedDays = 1}</code></programlisting>
 
     <informalexample>
       <para>This example shows how to generate a simple STK-TimePosVel (i.e.
-      STK .e) ephemeris file. Ephemeris file is generated for 1 day of
+      STK .e) ephemeris file. The ephemeris file is generated for one day of
       propagation, then a simple impulsive maneuver takes place and spacecraft
       propagates for another day. This ephemeris is generated at raw
       integrator steps.</para>

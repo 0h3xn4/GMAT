@@ -529,6 +529,11 @@ bool CCSDSEMSegment::SetMetaData(const std::string &fieldName,
       refFrame = value;
       return true;
    }
+   else if (fieldName == "REF_FRAME_EPOCH")
+   {
+      // Not used
+      return true;
+   }
    // @todo - check for this:
    // "The TIME_SYSTEM value must remain fixed within an AEM."
    else if (fieldName == "TIME_SYSTEM")

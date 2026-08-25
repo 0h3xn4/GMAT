@@ -59,15 +59,16 @@
 //----------------------------------
 
 //------------------------------------------------------------------------------
-// EphemWriterWithInterpolator(const std::string &name, const std::string &type)
+// EphemWriterWithInterpolator(const std::string &name, const std::string &type, const std::string& version)
 //------------------------------------------------------------------------------
 /**
  * Default constructor
  */
 //------------------------------------------------------------------------------
 EphemWriterWithInterpolator::EphemWriterWithInterpolator(const std::string &name,
-                                                         const std::string &type) :
-   EphemerisWriter      (name, type),
+                                                         const std::string& type,
+                                                         const std::string& version) :
+   EphemerisWriter      (name, type, version),
    interpolator         (NULL),
    interpolatorStatus   (-1),
    initialCount         (0),
@@ -261,14 +262,7 @@ void EphemWriterWithInterpolator::CreateInterpolator()
    // Create Interpolator
    if (interpolatorName == "Lagrange")
    {
-      // interpolator = new LagrangeInterpolator(ephemName + "_Lagrange", 27, 
-      //                                        interpolationOrder);
-
-      // It needs 9 elements for position, velocity, and acceleration and 21
-      // elements for lower triangular covariance matrix. Total is 30 elements.
-      // interpolator = new LagrangeInterpolator(ephemName + "_Lagrange", 6,
-      //                                         interpolationOrder);
-      interpolator = new LagrangeInterpolator(ephemName + "_Lagrange", 30,
+      interpolator = new LagrangeInterpolator(ephemName + "_Lagrange", 34,
                                               interpolationOrder);
       #ifdef DEBUG_INTERPOLATOR_TRACE
       MessageInterface::ShowMessage
@@ -298,13 +292,12 @@ void EphemWriterWithInterpolator::CreateInterpolator()
 
 //------------------------------------------------------------------------------
 // void FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs, 
-//        Real stateToWrite[6], Real covToWrite[21],Real accelToWrite[3])
+//        Real stateToWrite[6], Real covToWrite[21])
 //------------------------------------------------------------------------------
 void EphemWriterWithInterpolator::FindNextOutputEpoch(Real reqEpochInSecs,
                                                       Real &outEpochInSecs,
                                                       Real stateToWrite[6],
-                                                      Real covToWrite[21],
-                                                      Real accelToWrite[3])
+                                                      Real covToWrite[21])
 {
    #ifdef DEBUG_EPHEMFILE_TIME
    MessageInterface::ShowMessage
@@ -334,8 +327,6 @@ void EphemWriterWithInterpolator::FindNextOutputEpoch(Real reqEpochInSecs,
          stateToWrite[i] = currState[i];
       for (int i = 0; i < 21; i++)
          covToWrite[i] = currCov[i];
-      for (int i = 0; i < 3; i++)
-         accelToWrite[i] = currAccel[i];
 
       // Erase requested epoch from the epochs on waiting list if found (LOJ: 2010.02.28)
       RemoveEpochAlreadyWritten(reqEpochInSecs, "   =====> WriteOrbit() now erasing ");
@@ -353,8 +344,7 @@ void EphemWriterWithInterpolator::FindNextOutputEpoch(Real reqEpochInSecs,
 
 
 //------------------------------------------------------------------------------
-// bool IsTimeToWrite(Real epochInSecs, const Real state[6], const Real cov[21],
-//                    const Real accel[3])
+// bool IsTimeToWrite(Real epochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3])
 //------------------------------------------------------------------------------
 /*
  * Determines if it is time to write to ephemeris file based on the step size.
@@ -363,7 +353,7 @@ void EphemWriterWithInterpolator::FindNextOutputEpoch(Real reqEpochInSecs,
  */
 //------------------------------------------------------------------------------
 bool EphemWriterWithInterpolator::IsTimeToWrite(Real epochInSecs, const Real state[6],
-                                                const Real cov[21], const Real accel[3])
+                                                const Real cov[21], const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_TIME
    MessageInterface::ShowMessage
@@ -411,19 +401,16 @@ bool EphemWriterWithInterpolator::IsTimeToWrite(Real epochInSecs, const Real sta
             MessageInterface::ShowMessage
                ("   ===> IsTimeToWrite() calling interpolator->AddPoint(epochInSecs, state)\n");
             #endif
-            // Real fullState[27];
-            // memcpy(&fullState[0], state, sizeof (Real)*6);
-            // memcpy(&fullState[6], cov, sizeof (Real)*21);
-            // interpolator->AddPoint(epochInSecs, fullState);
 
-            
-            Real dependent[30];
+            Real dependent[34];
             for (Integer i = 0; i < 6; ++i)
                dependent[i] = state[i];
-            for (Integer i = 0; i < 3; ++i)
-               dependent[i + 6] = accel[i];
             for (Integer i = 0; i < 21; ++i)
-               dependent[i+9] = cov[i];
+               dependent[i + 6] = cov[i];
+            for (Integer i = 0; i < 4; ++i)
+               dependent[i + 27] = quat[i];
+            for (Integer i = 0; i < 3; ++i)
+               dependent[i + 31] = accel[i];
 
             // the state's dimension is expanded by adding accelaration and covariance
             // interpolator->AddPoint(epochInSecs, state);
@@ -599,7 +586,7 @@ bool EphemWriterWithInterpolator::IsTimeToWrite(Real epochInSecs, const Real sta
 
 //------------------------------------------------------------------------------
 // void WriteOrbitAt(Real reqEpochInSecs, const Real state[6],
-//                   const Real cov[21], const Real accel[3])
+//                   const Real cov[21], const Real quat[4], const Real accel[3])
 //------------------------------------------------------------------------------
 /**
  * Writes spacecraft orbit data to a ephemeris file at requested epoch
@@ -607,11 +594,11 @@ bool EphemWriterWithInterpolator::IsTimeToWrite(Real epochInSecs, const Real sta
  * @param reqEpochInSecs Requested epoch to write state in seconds
  * @param state State to write 
  * @param cov Covariance to write
- * @param accel    Acceleration to write
+ * @param accel Acceleration to write (if calculated)
  */
 //------------------------------------------------------------------------------
 void EphemWriterWithInterpolator::WriteOrbitAt(Real reqEpochInSecs, const Real state[6],
-                                    const Real cov[21], const Real accel[3], const Real quat[4])
+                                    const Real cov[21], const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_ORBIT
    MessageInterface::ShowMessage
@@ -632,7 +619,7 @@ void EphemWriterWithInterpolator::WriteOrbitAt(Real reqEpochInSecs, const Real s
          ProcessEpochsOnWaiting(false, false);
       }
       else
-         WriteOrbit(reqEpochInSecs, state, cov, accel, quat);
+         WriteOrbit(reqEpochInSecs, state, cov, quat, accel);
    }
    else
    {
@@ -764,7 +751,7 @@ void EphemWriterWithInterpolator::ProcessFinalDataOnWaiting(bool canFinish)
                MessageInterface::ShowMessage
                   ("   ===> Not using user defined final epoch, so writing final data\n");
                #endif
-               WriteOrbit(currEpochInSecs, currState, currCov, currAccel, currQuat);
+               WriteOrbit(currEpochInSecs, currState, currCov, currQuat, currAccel);
             }
          }
          else
@@ -808,13 +795,13 @@ void EphemWriterWithInterpolator::ProcessEpochsOnWaiting(bool checkFinalEpoch,
    #endif
    #endif
    
-   // estimates contains position, velocity, acceleration, and lower triagular covariance matrix
+   // estimates contains position, velocity, and lower triagular covariance matrix
    // Real estimates[6];
    Real estimates[34];
    Real stateEstimates[6];
    Real covEstimates[21];
-   Real accelEstimates[3];
    Real quatEstimates[4];
+   Real accelEstimates[3];
 
    // Real fullEstimates[27];
    Real reqEpochInSecs = 0.0;
@@ -939,17 +926,14 @@ void EphemWriterWithInterpolator::ProcessEpochsOnWaiting(bool checkFinalEpoch,
 
             for (Integer i = 0; i < 6; ++i)
                stateEstimates[i] = estimates[i];
-
-            // This line of code causes data overflow
-            //for (Integer i = 0; i < 6; ++i)
-            for (Integer i = 0; i < 3; ++i)
-               accelEstimates[i] = estimates[i+6];
             for (Integer i = 0; i < 21; ++i)
-               covEstimates[i] = estimates[i+9];
+               covEstimates[i] = estimates[i + 6];
             for (Integer i = 0; i < 4; ++i)
-               quatEstimates[i] = estimates[i + 30];
+               quatEstimates[i] = estimates[i + 27];
+            for (Integer i = 0; i < 3; ++i)
+               accelEstimates[i] = estimates[i + 31];
 
-            WriteOrbit(reqEpochInSecs, stateEstimates, covEstimates, accelEstimates, quatEstimates);
+            WriteOrbit(reqEpochInSecs, stateEstimates, covEstimates, quatEstimates, accelEstimates);
             RemoveEpochAlreadyWritten
                (reqEpochInSecs, "   =====> ProcessEpochsOnWaiting() now erasing ");
          }

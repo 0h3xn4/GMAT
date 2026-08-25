@@ -33,6 +33,7 @@
 #include "EphemerisWriter.hpp"
 #include "CoordinateSystem.hpp"
 #include "CoordinateConverter.hpp"
+#include "ODEModel.hpp"
 #include <iostream>
 #include <fstream>
 
@@ -80,7 +81,6 @@ public:
    
    virtual bool         IsParameterReadOnly(const Integer id) const;
    virtual bool         IsParameterCommandModeSettable(const Integer id) const;
-   virtual bool         IsParameterCloaked(const Integer id) const;
    
    virtual UnsignedInt
                         GetPropertyObjectType(const Integer id) const;
@@ -110,11 +110,15 @@ public:
    virtual const StringArray&
                         GetRefObjectNameArray(const UnsignedInt type);
 
+   virtual bool         IsParameterCloaked(const Integer id) const;
+
    void         StartNewSegment(const std::string &comments,
       bool saveEpochInfo,
       bool writeAfterData,
       bool ignoreBlankComments);
       
+   void SetTransientForces(std::vector<PhysicalModel*>* tf);
+
 protected:
    
    enum FileType
@@ -125,6 +129,7 @@ protected:
    
    Spacecraft        *spacecraft;
    CoordinateSystem  *outCoordSystem;
+   ODEModel          *accelModel;
    EphemerisWriter   *ephemWriter;
    
    /// ephemeris full file name including the path
@@ -134,11 +139,6 @@ protected:
    std::string prevFileName;
    std::string fileName;
    std::string fileFormat;
-   
-   std::string fileFormatVersion;
-   bool        addingAccelerationOption;
-   bool        addingCovarianceOption;
-
    std::string epochFormat;
    std::string initialEpochStr;
    std::string finalEpochStr;
@@ -148,6 +148,8 @@ protected:
    std::string outCoordSystemName;
    std::string outputFormat;
    std::string covFormat;
+   std::string formatVersion;
+   std::string accelModelName;
    bool        writeEphemeris;
    bool        usingDefaultFileName;
    bool        generateInBackground;
@@ -172,10 +174,9 @@ protected:
    Real        eventEpochInSecs;
    Real        currState[6];
    Real        currCov[21];
-
-   Real        currAccel[3];
    Real        currQuat[4];
-   
+   Real        currAccel[3];
+
    Real        stepSizeInSecs;
    
    bool        firstTimeWriting;
@@ -218,6 +219,8 @@ protected:
    static StringArray distanceUnitList;
    /// Available include event boundaries list
    static StringArray eventBoundariesList;
+
+   std::vector<PhysicalModel*>* transients;
    
    // Initialization
    void         ValidateParameters(bool forInitialization);
@@ -281,11 +284,6 @@ protected:
       FILENAME,
       FULLPATH_FILENAME,
       FILE_FORMAT,
-      
-      FILE_FORMAT_VERSION,
-      ADDING_ACCELERATION_OPTION,
-      ADDING_COVARIANCE_OPTION,
-
       EPOCH_FORMAT,
       INITIAL_EPOCH,
       FINAL_EPOCH,
@@ -300,6 +298,8 @@ protected:
       FILE_NAME,                // deprecated
       DISTANCE_UNIT,            // Meters or kilometers
       INCLUDE_EVENT_BOUNDARIES,
+      FORMAT_VERSION,
+      ACCELERATION_MODEL,
       EphemerisFileParamCount   // Count of the parameters for this class
    };
    

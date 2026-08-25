@@ -1204,7 +1204,6 @@ void ODEModel::UpdateSpaceObject(Real newEpoch)
    #endif
 
    memcpy(state->GetState(), rawState, vectorSize);
-   //memcpy(state->GetStateDot(), rawStateDot, vectorSize);
    
    Real newepoch = epoch + elapsedTime / GmatTimeConstants::SECS_PER_DAY;
    
@@ -1251,8 +1250,6 @@ void ODEModel::UpdateSpaceObjectGT(GmatTime newEpoch)
    #ifdef DEBUG_ODEMODEL_EXE
    MessageInterface::ShowMessage("Raw state: [%lf %lf %lf %lf %lf %lf ...\n", rawState[0],
       rawState[1], rawState[2], rawState[3], rawState[4], rawState[5]);
-   MessageInterface::ShowMessage("Raw state dot: [%.15le   %.15le   %.15le   %.15le   %.15le   %.15le ...\n", rawStateDot[0],
-      rawStateDot[1], rawStateDot[2], rawStateDot[3], rawStateDot[4], rawStateDot[5]);
    #endif
 
    ReturnFromOriginGT(newEpoch);
@@ -1266,15 +1263,9 @@ void ODEModel::UpdateSpaceObjectGT(GmatTime newEpoch)
    #ifdef DEBUG_ODEMODEL_EXE
    MessageInterface::ShowMessage("Raw state: [%lf %lf %lf %lf %lf %lf ...\n", rawState[0],
       rawState[1], rawState[2], rawState[3], rawState[4], rawState[5]);
-   MessageInterface::ShowMessage("Raw state dot: [%.15le   %.15le   %.15le   %.15le   %.15le   %.15le ...\n", rawStateDot[0],
-      rawStateDot[1], rawStateDot[2], rawStateDot[3], rawStateDot[4], rawStateDot[5]);
-   MessageInterface::ShowMessage("state->GetStateDot(): [%.15le   %.15le   %.15le   %.15le   %.15le   %.15le ...\n", state->GetStateDot()[0],
-      state->GetStateDot()[1], state->GetStateDot()[2], state->GetStateDot()[3], state->GetStateDot()[4], state->GetStateDot()[5]);
    #endif
 
    memcpy(state->GetState(), rawState, vectorSize);
-   //memcpy(state->GetStateDot(), rawStateDot, vectorSize);
-
 
    GmatTime newepoch = epochGT;
    newepoch.AddSeconds(elapsedTime);
@@ -1334,7 +1325,6 @@ void ODEModel::UpdateFromSpaceObject()
    //MessageInterface::ShowMessage("]\n");
 
    memcpy(rawState, state->GetState(), state->GetSize() * sizeof(Real));
-   memcpy(rawStateDot, state->GetStateDot(), state->GetSize() * sizeof(Real));
 
     // Transform to the force model origin
     // MoveToOrigin();					   // Notice that: without epoch, it will get wrong state of center body
@@ -1380,7 +1370,6 @@ void ODEModel::RevertSpaceObject()
    elapsedTime = prevElapsedTime;
 
    memcpy(rawState, previousState.GetState(), dimension*sizeof(Real));
-   memcpy(rawStateDot, previousState.GetStateDot(), dimension * sizeof(Real));
 
    if (hasPrecisionTime)
       MoveToOriginGT();
@@ -1878,23 +1867,13 @@ bool ODEModel::Initialize()
       delete rawState;
    rawState = new Real[dimension];
 
-   // rawStateDot deallocated in PhysicalModel::Initialize() method so reallocate
-   if ((rawStateDot) && (rawStateDot != modelStateDot))
-      delete rawStateDot;
-   rawStateDot = new Real[dimension];
-
    #ifdef DEBUG_MEMORY
    MemoryTracker::Instance()->Add
       (rawState, "rawState", "ODEModel::Initialize()",
        "rawState = new Real[dimension]", this);
-
-   MemoryTracker::Instance()->Add
-   (rawStateDot, "rawStateDot", "ODEModel::Initialize()", 
-      "rawStateDot = new Real[dimension]", this);
    #endif
 
    memcpy(rawState, state->GetState(), dimension * sizeof(Real));
-   memcpy(rawStateDot, state->GetStateDot(), dimension * sizeof(Real));
 
    // update the starting time to the first available time for the origin.
    // This is necessary because there may not be data for the force origin body
@@ -3271,14 +3250,6 @@ bool ODEModel::GetDerivatives(Real * state, Real dt, Integer order,
          debugFile << "   " << (*i)->GetTypeName();
       #endif
 
-
-      // Note that: value of derivative array is only available after GMAT perform
-      // calculation of derivative. Therefore, GetDerivativeArray() is only valid
-      // after running GetDerivatives(). At initial time, when running any
-      // propagation enabled command (RunEstimator or Propagate commands), GMAT runs
-      // PropagationEnabledCommand::CalculateStateDotAtInitialEpoch() to call
-      // ODE::GetDerivative(state, dt = 0.0) with dt = 0.0.
-
       //ddt = (*i)->GetDerivativeArray();
       if (!(*i)->GetDerivatives(state, dt, order))
       {
@@ -3498,66 +3469,6 @@ bool ODEModel::GetDerivatives(Real * state, Real dt, Integer order,
          throw ODEModelException("The ForceModel " + instanceName +
                " generated a derivative that is infinite");
    }
-
-   // Calculate derivative in j2kbody MJ2000 coordinate system
-   //for (Integer i = 0; i < dimension; ++i)
-   //   MessageInterface::ShowMessage("@@@@   deriv[%d] = %.15le\n", i, deriv[i]);
-
-   // Update stateDot
-   memcpy(psm->GetState()->GetStateDot(), deriv, dimension * sizeof(Real));
-   memcpy(modelStateDot, deriv, dimension * sizeof(Real));
-
-   memcpy(rawDeriv, deriv, dimension * sizeof(Real));
-   if ((fillCartesian) && (j2kBody != forceOrigin))
-   {
-      // Calculate state change and acceleration change when change coordinate system from force central body to j2k internal coordinate system
-      Real now;
-      GmatTime nowGT;
-      Rvector6 cbState, j2kState, delta;
-      Rvector3 cbAcceleration, j2kAcceleration, deltaAcceleration;
-      if (hasPrecisionTime)
-      {
-         nowGT = epochGT;
-         nowGT.AddSeconds(dt);
-         cbState = forceOrigin->GetState(nowGT);
-         j2kState = j2kBody->GetState(nowGT);
-         cbAcceleration = forceOrigin->GetAcceleration(nowGT);
-         j2kAcceleration = j2kBody->GetAcceleration(nowGT);
-      }
-      else
-      {
-         now = epoch + dt / GmatTimeConstants::SECS_PER_DAY;
-         cbState = forceOrigin->GetState(now);
-         j2kState = j2kBody->GetState(now);
-         cbAcceleration = forceOrigin->GetAcceleration(now);
-         j2kAcceleration = j2kBody->GetAcceleration(now);
-      }
-      delta = j2kState - cbState;
-      deltaAcceleration = j2kAcceleration - cbAcceleration;
-
-      // Convert state derivative from force model coordinate system to j2k body internal coordinate system 
-      if (order == 1)  // Fill in 1st dv of position with the input velocity
-      {
-         Real derivDelta[6];
-         for (Integer i = 0; i < 3; ++i)
-            derivDelta[i] = delta[i + 3];
-         for (Integer i = 0; i < 3; ++i)
-            derivDelta[i + 3] = deltaAcceleration[i];
-
-         for (Integer i = 0; i < cartStateSize; i += 6)
-         {
-            for (Integer j = 0; j < 6; ++j)
-            {
-               rawDeriv[cartesianStart + i + j] = deriv[cartesianStart + i + j] 
-                                                   - derivDelta[j];
-            }
-         }
-      }
-   }
-
-   memcpy(rawStateDot, rawDeriv, dimension * sizeof(Real));
-   //for (Integer i = 0; i < dimension; ++i)
-   //   MessageInterface::ShowMessage("@@@@   rawDeriv[%d] = %.15le\n", i, rawDeriv[i]);
 
    return true;
 }
@@ -6002,7 +5913,6 @@ void ODEModel::MoveToOrigin(Real newEpoch)
 #endif
     
    memcpy(modelState, rawState, dimension*sizeof(Real));
-   memcpy(modelStateDot, rawStateDot, dimension * sizeof(Real));
 
    if (centralBodyName != j2kBodyName)
    {
@@ -6012,11 +5922,6 @@ void ODEModel::MoveToOrigin(Real newEpoch)
       cbState = forceOrigin->GetState(now);
       j2kState = j2kBody->GetState(now);
       delta = cbState - j2kState;
-
-      Rvector3 cbAcceleration, j2kAcceleration, deltaAcceleration;
-      cbAcceleration = forceOrigin->GetAcceleration(now);
-      j2kAcceleration = j2kBody->GetAcceleration(now);
-      deltaAcceleration = cbAcceleration - j2kAcceleration;
 
       for (Integer i = 0; i < cartesianCount; ++i)
       {
@@ -6028,20 +5933,6 @@ void ODEModel::MoveToOrigin(Real newEpoch)
             modelState[i6 + j] = rawState[i6 + j] - delta[j];
          }
 
-         // Calculate value of modelStateDot
-         for (Integer j = 0; j < 6; ++j)
-         {
-            if (j < 3)
-            {
-               // Calculate rDot (velocity)
-               modelStateDot[i6 + j] = rawStateDot[i6 + j] - delta[j + 3];
-            }
-            else
-            {
-               // Calculate vDot (acceleration)
-               modelStateDot[i6 + j] = rawStateDot[i6 +j] - deltaAcceleration[j - 3];
-            }
-         }
          #ifdef DEBUG_REORIGIN
             MessageInterface::ShowMessage(
                 "ODEModel::MoveToOrigin()\n"
@@ -6104,7 +5995,6 @@ void ODEModel::MoveToOriginGT(GmatTime newEpoch)
 #endif
 
    memcpy(modelState, rawState, dimension*sizeof(Real));
-   memcpy(modelStateDot, rawStateDot, dimension * sizeof(Real));
 
    if (centralBodyName != j2kBodyName)
    {
@@ -6117,11 +6007,6 @@ void ODEModel::MoveToOriginGT(GmatTime newEpoch)
 
       delta = cbState - j2kState;
 
-      Rvector3 cbAcceleration, j2kAcceleration, deltaAcceleration;
-      cbAcceleration = forceOrigin->GetAcceleration(now);
-      j2kAcceleration = j2kBody->GetAcceleration(now);
-      deltaAcceleration = cbAcceleration - j2kAcceleration;
-
       for (Integer i = 0; i < cartesianCount; ++i)
       {
          Integer i6 = cartesianStart + i * 6;
@@ -6132,21 +6017,6 @@ void ODEModel::MoveToOriginGT(GmatTime newEpoch)
             modelState[i6 + j] = rawState[i6 + j] - delta[j];
          }
 
-         // Calculate value of modelStateDot
-         for (Integer j = 0; j < 6; ++j)
-         {
-            if (j < 3)
-            {
-               // Calculate rDot (velocity)
-               modelStateDot[i6 + j] = rawStateDot[i6 + j] - delta[j + 3];
-            }
-            else
-            {
-               // Calculate vDot (acceleration)
-               modelStateDot[i6 + j] = rawStateDot[i6 + j] - deltaAcceleration[j - 3];
-            }
-               
-         }
 #ifdef DEBUG_REORIGIN
          MessageInterface::ShowMessage(
             "ODEModel::MoveToOrigin()\n"
@@ -6198,7 +6068,6 @@ void ODEModel::ReturnFromOrigin(Real newEpoch)
    #endif
 
    memcpy(rawState, modelState, dimension*sizeof(Real));
-   memcpy(rawStateDot, modelStateDot, dimension * sizeof(Real));
 
    if (centralBodyName != j2kBodyName)
    {
@@ -6209,11 +6078,6 @@ void ODEModel::ReturnFromOrigin(Real newEpoch)
 
       delta = j2kState - cbState;
 
-      Rvector3 cbAcceleration, j2kAcceleration, deltaAcceleration;
-      cbAcceleration = forceOrigin->GetAcceleration(now);
-      j2kAcceleration = j2kBody->GetAcceleration(now);
-      deltaAcceleration = j2kAcceleration - cbAcceleration;
-
       for (Integer i = 0; i < cartesianCount; ++i)
       {
          Integer i6 = cartesianStart + i * 6;
@@ -6223,20 +6087,6 @@ void ODEModel::ReturnFromOrigin(Real newEpoch)
             rawState[i6 + j] = modelState[i6 + j] - delta[j];
          }
 
-         // Calculate value of rawStateDot
-         for (Integer j = 0; j < 6; ++j)
-         {
-            if (j < 3)
-            {
-               // Calculate rDot (velocity)
-               rawStateDot[i6 + j] = modelStateDot[i6 + j] - delta[j + 3];
-            }
-            else
-            {
-               // Calculate vDot (acceleration)
-               rawStateDot[i6 + j] = modelStateDot[i6 + j] - deltaAcceleration[j - 3];
-            }
-         }
          #ifdef DEBUG_REORIGIN
                MessageInterface::ShowMessage(
                    "ODEModel::ReturnFromOrigin()\n   Input (model) state: [%lf %lf %lf %lf %lf"
@@ -6266,7 +6116,6 @@ void ODEModel::ReturnFromOriginGT(GmatTime newEpoch)
 #endif
 
    memcpy(rawState, modelState, dimension*sizeof(Real));
-   memcpy(rawStateDot, modelStateDot, dimension * sizeof(Real));
 
    if (centralBodyName != j2kBodyName)
    {
@@ -6279,11 +6128,6 @@ void ODEModel::ReturnFromOriginGT(GmatTime newEpoch)
 
       delta = j2kState - cbState;
 
-      Rvector3 cbAcceleration, j2kAcceleration, deltaAcceleration;
-      cbAcceleration = forceOrigin->GetAcceleration(now);
-      j2kAcceleration = j2kBody->GetAcceleration(now);
-      deltaAcceleration = j2kAcceleration - cbAcceleration;
-
       for (Integer i = 0; i < cartesianCount; ++i)
       {
          Integer i6 = cartesianStart + i * 6;
@@ -6291,21 +6135,6 @@ void ODEModel::ReturnFromOriginGT(GmatTime newEpoch)
          for (Integer j = 0; j < 6; ++j)
          {
             rawState[i6 + j] = modelState[i6 + j] - delta[j];
-         }
-
-         // Calculate value of rawStateDot
-         for (Integer j = 0; j < 6; ++j)
-         {
-            if (j < 3)
-            {
-               // Calculate rDot (velocity)
-               rawStateDot[i6 + j] = modelStateDot[i6 + j] - delta[j + 3];
-            }
-            else
-            {
-               // Calculate vDot (acceleration)
-               rawStateDot[i6 + j] = modelStateDot[i6 + j] - deltaAcceleration[j - 3];
-            }
          }
 
          #ifdef DEBUG_REORIGIN

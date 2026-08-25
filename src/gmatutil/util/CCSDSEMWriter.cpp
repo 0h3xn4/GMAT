@@ -50,13 +50,13 @@
 // -----------------------------------------------------------------------------
 // default constructor
 // -----------------------------------------------------------------------------
-CCSDSEMWriter::CCSDSEMWriter() :
-   versionNumber (""),
-   writeAcceleration (false),
-   writeCovariance   (false),
-   originator    (""),
-   creationTime  (""),
-   emFileName    ("")
+CCSDSEMWriter::CCSDSEMWriter(const std::string &versionNumber) :
+   versionNumber   (versionNumber),
+   originator      (""),
+   creationTime    (""),
+   useCovariance   (false),
+   useAcceleration (false),
+   emFileName      ("")
 {
    theTimeConverter = TimeSystemConverter::Instance();
 }
@@ -66,12 +66,12 @@ CCSDSEMWriter::CCSDSEMWriter() :
 // -----------------------------------------------------------------------------
 CCSDSEMWriter::CCSDSEMWriter(const CCSDSEMWriter &copy) :
    versionNumber (copy.versionNumber),
-   writeAcceleration (copy.writeAcceleration),
-   writeCovariance(copy.writeCovariance),
 
-   originator    (copy.originator),
-   creationTime  (copy.creationTime),
-   emFileName    (copy.emFileName)
+   originator      (copy.originator),
+   creationTime    (copy.creationTime),
+   useCovariance   (copy.useCovariance),
+   useAcceleration (copy.useAcceleration),
+   emFileName      (copy.emFileName)
 {
    theTimeConverter = TimeSystemConverter::Instance();
 }
@@ -85,12 +85,12 @@ CCSDSEMWriter& CCSDSEMWriter::operator=(const CCSDSEMWriter &copy)
       return *this;
 
    versionNumber = copy.versionNumber;
-   writeAcceleration = copy.writeAcceleration;
-   writeCovariance = copy.writeCovariance;
 
-   originator    = copy.originator;
-   creationTime  = copy.creationTime;
-   emFileName    = copy.emFileName;
+   originator      = copy.originator;
+   creationTime    = copy.creationTime;
+   useCovariance   = copy.useCovariance;
+   useAcceleration = copy.useAcceleration;
+   emFileName      = copy.emFileName;
    
    return *this;
 }
@@ -298,6 +298,22 @@ void CCSDSEMWriter::ClearHeader()
 // -----------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
+// void SetUseCovariance(bool useCovariance)
+//------------------------------------------------------------------------------
+void CCSDSEMWriter::SetUseCovariance(bool useCovariance)
+{
+   this->useCovariance = useCovariance;
+}
+
+//------------------------------------------------------------------------------
+// void SetUseAcceleration(bool useAcceleration)
+//------------------------------------------------------------------------------
+void CCSDSEMWriter::SetUseAcceleration(bool useAcceleration)
+{
+   this->useAcceleration = useAcceleration;
+}
+
+//------------------------------------------------------------------------------
 // std::string A1ModJulianToUtcGregorian(Real epochInDays, Integer format = 1)
 //------------------------------------------------------------------------------
 /**
@@ -333,19 +349,3 @@ std::string CCSDSEMWriter::A1ModJulianToUtcGregorian(Real epochInDays, Integer f
    
    return epochStr;
 }
-
-
-
-bool CCSDSEMWriter::SetWritingAccelerationOption(const bool writeOption)
-{
-   writeAcceleration = writeOption;
-   return writeAcceleration;
-};
-
-                                                   
-
-bool CCSDSEMWriter::SetWritingCovarianceOption(const bool writeOption)
-{
-   writeCovariance = writeOption;
-   return writeCovariance;
-};

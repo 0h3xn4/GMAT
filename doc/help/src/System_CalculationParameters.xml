@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry version="5.0" xml:id="CalculationParameters" xml:lang="en-US"
-          xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude"
-          xmlns:svg="http://www.w3.org/2000/svg"
-          xmlns:m="http://www.w3.org/1998/Math/MathML"
-          xmlns:html="http://www.w3.org/1999/xhtml"
-          xmlns:db="http://docbook.org/ns/docbook">
+          xmlns="http://docbook.org/ns/docbook">
   <indexterm>
     <primary>Calculation Parameters</primary>
   </indexterm>
@@ -4609,6 +4603,44 @@
 
                     <listitem>
                       <para>(None)</para>
+                    </listitem>
+                  </varlistentry>
+                </variablelist></entry>
+            </row>
+
+            <row>
+              <entry><guilabel>OrbitErrorCovariance</guilabel></entry>
+
+              <entry>Y</entry>
+
+              <entry>N</entry>
+
+              <entry><para>See Spacecraft Navigation <link
+              linkend="SpacecraftNavigation_OrbitErrorCovariance"><guilabel>OrbitErrorCovariance</guilabel></link>.
+              The current spacecraft 6x6 (position and velocity only)
+              covariance matrix in the referenced coordinate
+              system.</para><variablelist>
+                  <varlistentry>
+                    <term>Data Type</term>
+
+                    <listitem>
+                      <para>Array (6×6)</para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Dependency</term>
+
+                    <listitem>
+                      <para><guilabel>CoordinateSystem</guilabel></para>
+                    </listitem>
+                  </varlistentry>
+
+                  <varlistentry>
+                    <term>Units</term>
+
+                    <listitem>
+                      <para>km^2, km^2/sec^2</para>
                     </listitem>
                   </varlistentry>
                 </variablelist></entry>

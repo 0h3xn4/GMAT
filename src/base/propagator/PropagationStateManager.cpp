@@ -569,31 +569,6 @@ bool PropagationStateManager::MapObjectsToVector()
 
             state[index] = value;
 
-            // Update stateDot
-            //state.GetStateDot()[index] = 0.0; 
-
-            if (stateMap[index]->object->IsOfType(Gmat::SPACECRAFT))
-            {
-               Integer idx = stateMap[index]->parameterID - cartesianStateID;
-               if (idx == 5)
-               {
-                  // Update rDot (velocity)
-                  for (Integer k = 0; k < 3; ++k)
-                     (state.GetStateDot())[index - 5 + k] = state[index - 2 + k];
-
-                  // Update vDot (acceleration)
-                  Rvector3 accel = ((Spacecraft*)(stateMap[index]->object))->GetAcceleration();
-                  for (Integer k = 3; k < 6; ++k)
-                     (state.GetStateDot())[index - 5 + k] = accel[k - 3];
-
-                  #ifdef DEBUG_OBJECT_UPDATES
-                     for (Integer k = 0; k < 6; ++k)
-                        MessageInterface::ShowMessage("  stateDot[%d] = %.15le\n", 
-                           index - 5 + k, (state.GetStateDot())[index - 5 + k]);
-                  #endif
-
-               }
-            }
             break;
          }
          case Gmat::RVECTOR_TYPE:
@@ -669,8 +644,8 @@ bool PropagationStateManager::MapObjectsToVector()
 			msg << stateMap[index]->subelement;
 			std::string lbl = stateMap[index]->objectName + "." +
 				stateMap[index]->elementName + "." + msg.str() + " = ";
-			MessageInterface::ShowMessage("   %d: %s%.12le. Its dot is %.12le\n", index, lbl.c_str(), 
-				state[index], state.GetStateDot()[index]);
+			MessageInterface::ShowMessage("   %d: %s%.12le.\n", index, lbl.c_str(), 
+				state[index]);
 		}
 
 		// Look at state data after
@@ -737,8 +712,8 @@ bool PropagationStateManager::MapVectorToObjects()
 			msg << stateMap[index]->subelement;
 			std::string lbl = stateMap[index]->objectName + "." +
 				stateMap[index]->elementName + "." + msg.str() + " = ";
-			MessageInterface::ShowMessage("   %d: %s%.12le. Its dot = %.15le\n", index, lbl.c_str(), 
-				state[index], state.GetStateDot()[index]);
+			MessageInterface::ShowMessage("   %d: %s%.12le.\n", index, lbl.c_str(), 
+				state[index]);
       #endif
 
       // Log the oldSTM for use in Process noise calculation
@@ -762,30 +737,6 @@ bool PropagationStateManager::MapVectorToObjects()
             (stateMap[index]->object)->SetRealParameter(
                stateMap[index]->parameterID, state[index]);
             
-            if (stateMap[index]->object->IsOfType(Gmat::SPACECRAFT))
-            {
-               Integer accelIndex = stateMap[index]->parameterID - (cartesianStateID + 3);
-               #ifdef DEBUG_OBJECT_UPDATES
-                  MessageInterface::ShowMessage("accelIndex = %d - %d = %d\n", 
-                     stateMap[index]->parameterID, (cartesianStateID + 3), accelIndex);
-               #endif
-               if (accelIndex == 0)
-               {
-                  acceleration[0] = (state.GetStateDot())[index];
-                  acceleration[1] = (state.GetStateDot())[index + 1];
-                  acceleration[2] = (state.GetStateDot())[index + 2];
-
-                  ((Spacecraft*)(stateMap[index]->object))->SetAcceleration(acceleration);
-
-                  #ifdef DEBUG_OBJECT_UPDATES
-                     MessageInterface::ShowMessage("  acceleration = [%.15le   %.15le   %.15le]\n", 
-                        acceleration[0], acceleration[1], acceleration[2]);
-                  #endif
-                  
-                  // clear its value for the next acceleration value setting
-                  acceleration.Set(0.0, 0.0, 0.0);
-               }
-            }
             break;
          }
          case Gmat::RVECTOR_TYPE:
@@ -1277,16 +1228,6 @@ Integer PropagationStateManager::SortVector()
       MessageInterface::ShowMessage(
             "Finished PropagationStateManager::SortVector()\n");
    #endif
-
-   // It needs to speicify ID of spacecraft's CartesianState pramater in order to map acceleration values
-   for (Integer i = 0; i < objects.size(); ++i)
-   {
-      if (objects[i]->IsOfType(Gmat::SPACECRAFT))
-      {
-         cartesianStateID = ((Spacecraft*)(objects[i]))->GetParameterID("CartesianState");
-         break;
-      }
-   }
 
    return stateSize;
 }

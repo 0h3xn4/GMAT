@@ -37,7 +37,7 @@ class GMATUTIL_API CCSDSOEMWriter : public CCSDSEMWriter
 {
 public:
    /// class methods
-   CCSDSOEMWriter();
+   CCSDSOEMWriter(const std::string &versionNumber);
    CCSDSOEMWriter(const CCSDSOEMWriter &copy);
    CCSDSOEMWriter& operator=(const CCSDSOEMWriter &copy);
    

@@ -35,7 +35,7 @@
 class GMAT_API EphemWriterSTK : public EphemWriterWithInterpolator
 {
 public:
-   EphemWriterSTK(const std::string &name, const std::string &type = "EphemWriterSTK");
+   EphemWriterSTK(const std::string &name, const std::string &type = "EphemWriterSTK", const std::string &version = "stk.v.10.0");
    virtual ~EphemWriterSTK();
    EphemWriterSTK(const EphemWriterSTK &);
    EphemWriterSTK& operator=(const EphemWriterSTK&);
@@ -56,9 +56,8 @@ protected:
    bool             includeEventBoundaries;
    
    // Abstract methods required by all subclasses
-   // virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21]);
    virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21],
-                                const Real accel[3], const Real quat[4]);
+                                const Real quat[4], const Real accel[3]);
    
    // Initialization
    virtual void CreateEphemerisFile(bool useDefaultFileName,

@@ -39,7 +39,7 @@ class GMATUTIL_API CCSDSEMWriter
 {
 public:
    /// class methods
-   CCSDSEMWriter();
+   CCSDSEMWriter(const std::string &versionNumber);
    CCSDSEMWriter(const CCSDSEMWriter &copy);
    CCSDSEMWriter& operator=(const CCSDSEMWriter &copy);
    
@@ -56,6 +56,9 @@ public:
    virtual bool         WriteString(const std::string &str);
    virtual void         ClearHeaderComments();
    virtual void         ClearHeader();
+
+   void SetUseCovariance(bool useCovariance);
+   void SetUseAcceleration(bool useAcceleration);
    
    /// Methods subclasses should provide
    virtual bool         WriteMetaData() = 0;
@@ -73,19 +76,15 @@ public:
    virtual void         ClearMetaData() = 0;
    virtual void         ClearDataStore() = 0;
 
-   virtual bool         SetWritingAccelerationOption(const bool writeOption);
-   virtual bool         SetWritingCovarianceOption(const bool writeOption);
-   
 protected:
 
    /// Required header fields
    std::string versionNumber;
    std::string originator;
    std::string creationTime;
-   
-   /// Writing options
-   bool writeAcceleration;
-   bool writeCovariance;
+
+   bool useCovariance;
+   bool useAcceleration;
 
    /// Optional header field
    StringArray headerComments;

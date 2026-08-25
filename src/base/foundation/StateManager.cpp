@@ -791,25 +791,3 @@ bool StateManager::PrepareAttitudeDataToPublish(Real* publishData,
 
    return true;
 }
-
-Rvector3 StateManager::GetAccelerationOfSpacecraft(GmatBase* obj)
-{
-   if (!obj->IsOfType(Gmat::SPACECRAFT))
-      throw GmatBaseException("Error: Input of GetAccelerationOfSpacecraft is not a Spacecraft object\n");
-
-   
-   Integer cartesianStateID = ((Spacecraft*)obj)->GetParameterID("CartesianState");
-   Integer i = 0;
-   for (; i < stateMap.size(); ++i)
-   {
-      if ((stateMap[i]->object == obj) && (stateMap[i]->parameterID == (cartesianStateID + 3)))
-         break;
-   }
-
-   Rvector3 acceleration;
-   for (Integer k = 0; k < 3; ++k)
-      acceleration[k] = state.GetStateDot()[i + k];
-
-   return acceleration;
-}
-

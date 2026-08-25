@@ -170,8 +170,6 @@ public:
                                                  Integer attStartIndex,
                                                  bool hasPrecisionTime);
 
-   virtual Rvector3 GetAccelerationOfSpacecraft(GmatBase* obj);
-
 protected:
    /// Size of the managed state vector
    Integer                    stateSize;

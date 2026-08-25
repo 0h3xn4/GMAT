@@ -52,10 +52,9 @@
 // -----------------------------------------------------------------------------
 // default constructor
 // -----------------------------------------------------------------------------
-CCSDSOEMWriter::CCSDSOEMWriter() :
-   CCSDSEMWriter()
+CCSDSOEMWriter::CCSDSOEMWriter(const std::string &versionNumber) :
+   CCSDSEMWriter(versionNumber), currentOemSegment(versionNumber)
 {
-   versionNumber = "1.0";
 }
 
 // -----------------------------------------------------------------------------
@@ -184,13 +183,6 @@ bool CCSDSOEMWriter::WriteDataSegment()
          return false;
    }
 
-   std::stringstream ss;
-   if (writeCovariance)
-   {
-      ss << "\n";
-      ss << "COVARIANCE_START\n";
-   }
-
    std::string covRefFrame = currentOemSegment.GetRefFrame();
    
    for (Integer i = 0; i < numPoints; i++)
@@ -200,62 +192,24 @@ bool CCSDSOEMWriter::WriteDataSegment()
 
       if (currentOemSegment.GetEpochAndData(i, epoch, data))
       {
-         if ((i > 0) && (writeCovariance))
-            ss << "\n";
-         
-         //if ((versionNumber == "1.0")&&(data.GetSize() != 6))
-         //{
-         //   MessageInterface::ShowMessage 
-         //      ("*** INTERNAL ERROR *** CCSDS OEM v1.0 data size is not 6\n");
-         //   retval = false;
-         //   break;
-         //}
-         
          const Real *outState = data.GetDataVector();
          std::string epochStr = epochStrs[i];
          char strBuff[300];
-         sprintf(strBuff, "%s  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e",
-            epochStr.c_str(), outState[0], outState[1], outState[2], outState[3],
-            outState[4], outState[5]);
-         emOutStream << strBuff;
 
-         if (versionNumber == "2.0")
+         if (useAcceleration)
          {
-            // Write out acceleration
-            if (writeAcceleration)
-            {
-               sprintf(strBuff, "  % 1.15e  % 1.15e  % 1.15e", 
-                  outState[6], outState[7], outState[8]);
-               emOutStream << strBuff;
-            }
-    
-            if (writeCovariance)
-            {
-               // Write out lower-left covariance matrix
-               char strBuff1[200];
-               ss << "EPOCH = " << epochStr << "\n";
-               ss << "COV_REF_FRAME = " << covRefFrame << "\n";
-               std::string lineFormat = "% 1.15e";
-               Integer idx = 9;
-               for (Integer row = 0; row < 6; ++row)
-               {
-                  for (Integer col = 0; col < 6; ++col)
-                  {
-                     if (row < col)
-                        continue;
-
-                     sprintf(strBuff1, "% 1.15e", outState[idx]);
-                     ++idx;
-                     ss << strBuff1;
-                     if (row == col)
-                        ss << "\n";
-                     else
-                        ss << "  ";
-                  }
-               }
-            }
+            sprintf(strBuff, "%s  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e\n",
+               epochStr.c_str(), outState[0], outState[1], outState[2], outState[3],
+               outState[4], outState[5], outState[27], outState[28], outState[29]);
          }
-         emOutStream << "\n";
+         else
+         {
+            sprintf(strBuff, "%s  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e\n",
+               epochStr.c_str(), outState[0], outState[1], outState[2], outState[3],
+               outState[4], outState[5]);
+         }
+
+         emOutStream << strBuff;
       }
       else
       {
@@ -265,13 +219,62 @@ bool CCSDSOEMWriter::WriteDataSegment()
          break;
       }
    }
+
+   if (useCovariance)
+   {
+      emOutStream << "\n";
+      emOutStream << "COVARIANCE_START" << "\n";
+
+      for (Integer i = 0; i < numPoints; i++)
+      {
+         if (i != numPoints - 1 && epochStrs[i] == epochStrs[i + 1])
+            continue;
+
+         if (currentOemSegment.GetEpochAndData(i, epoch, data))
+         {
+            const Real* outState = data.GetDataVector();
+            std::string epochStr = epochStrs[i];
+            char strBuff[300];
+
+            sprintf(strBuff, "EPOCH = %s\n", epochStr.c_str());
+            emOutStream << strBuff;
+
+            sprintf(strBuff, "  % 1.15e\n",
+               outState[6]);
+            emOutStream << strBuff;
+
+            sprintf(strBuff, "  % 1.15e  % 1.15e\n",
+               outState[7], outState[8]);
+            emOutStream << strBuff;
+
+            sprintf(strBuff, "  % 1.15e  % 1.15e  % 1.15e\n",
+               outState[9], outState[10], outState[11]);
+            emOutStream << strBuff;
+
+            sprintf(strBuff, "  % 1.15e  % 1.15e  % 1.15e  % 1.15e\n",
+               outState[12], outState[13], outState[14], outState[15]);
+            emOutStream << strBuff;
+
+            sprintf(strBuff, "  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e\n",
+               outState[16], outState[17], outState[18], outState[19], outState[20]);
+            emOutStream << strBuff;
+
+            sprintf(strBuff, "  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e  % 1.15e\n",
+               outState[21], outState[22], outState[23], outState[24], outState[25], outState[26]);
+            emOutStream << strBuff;
+         }
+         else
+         {
+            MessageInterface::ShowMessage
+            ("*** INTERNAL ERROR *** data index %d out of range\n", i);
+            retval = false;
+            break;
+         }
+      }
+
+      emOutStream << "COVARIANCE_STOP" << "\n";
+   }
    
-   if (writeCovariance)
-      ss << "COVARIANCE_STOP\n";
-
-   if (versionNumber == "2.0")
-      emOutStream << ss.str();
-
    emOutStream.flush();      
    
    // Clears data store
@@ -369,9 +372,10 @@ bool CCSDSOEMWriter::AddDataComment(const std::string& comment)
  *
  * @epoch Epoch of data to be added to the CCSDS data store
  * @data Data to be added to the CCSDS data store
+ * @accel Acceleration to be added to the data store (may be zero is not used)
  */
-//------------------------------------------------------------------------------
-bool CCSDSOEMWriter::AddDataForWriting(Real epoch, Rvector &data)
+ //------------------------------------------------------------------------------
+bool CCSDSOEMWriter::AddDataForWriting(Real epoch, Rvector& data)
 {
    #ifdef DEBUG_DATA_SEGMENT
    MessageInterface::ShowMessage("CCSDSOEMWriter::AddDataForWriting() entered\n");
@@ -380,7 +384,7 @@ bool CCSDSOEMWriter::AddDataForWriting(Real epoch, Rvector &data)
    currentOemSegment.AddDataForWriting(epoch, data);
    
    #ifdef DEBUG_DATA_SEGMENT
-   MessageInterface::ShowMessage("CCSDSOEMWriter::AddDataForWriting() entered\n");
+   MessageInterface::ShowMessage("CCSDSOEMWriter::AddDataForWriting() exit\n");
    #endif
    return true;
 }

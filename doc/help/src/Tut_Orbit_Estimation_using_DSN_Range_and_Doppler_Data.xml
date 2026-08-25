@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <chapter version="5.0"
          xml:id="Orbit_Estimation_using_DSN_Range_and_Doppler_Data"
-         xmlns="http://docbook.org/ns/docbook"
-         xmlns:xlink="http://www.w3.org/1999/xlink"
-         xmlns:xi="http://www.w3.org/2001/XInclude"
-         xmlns:svg="http://www.w3.org/2000/svg"
-         xmlns:m="http://www.w3.org/1998/Math/MathML"
-         xmlns:html="http://www.w3.org/1999/xhtml"
-         xmlns:db="http://docbook.org/ns/docbook">
+         xmlns="http://docbook.org/ns/docbook">
   <title>Orbit Estimation using DSN Range and Doppler Data</title>
 
   <variablelist>
@@ -524,14 +518,6 @@ Fm.RelativisticCorrection  = On;
 Fm.ErrorControl            = None;
 Prop.FM                    = Fm;
 Prop.MinStep               = 0;    </programlisting>
-
-    <para>We set <code>ErrorControl = None</code> because for the current
-    release of GMAT, batch estimation requires fixed step numerical
-    integration. The fixed step size is given by
-    <code>Prop.InitialStepSize</code> which has a default value of 60 seconds.
-    For our deep space orbit, the dynamics are slowly changing and this step
-    size is not too big. For more dynamic force models, a smaller step size
-    may be needed.</para>
   </section>
 
   <section xml:id="DSN_Estimation_Create_and_configure_BatchEstimator_object">
@@ -570,9 +556,9 @@ bat.MatlabFile                 =  ...
     message window.</para>
 
     <para>In the third line, we set the <guilabel>ReportStyle</guilabel> to
-    Normal. If we wanted to see additional data such as
-    measurement partial derivatives, we would use the Verbose style by setting
-    RUN_MODE = Testing in the GMAT startup file. In the next line, we set the
+    Normal. If we wanted to see additional data such as measurement partial
+    derivatives, we would use the Verbose style by setting RUN_MODE = Testing
+    in the GMAT startup file. In the next line, we set the
     <guilabel>ReportFile</guilabel> field to the name of our desired output
     file which by default is written to GMAT’s ‘output’ directory.</para>
 

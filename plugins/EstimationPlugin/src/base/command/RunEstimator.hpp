@@ -121,6 +121,9 @@ protected:
    //Solve mode state when command is used
    std::string solveMode;
 
+   // For statistics
+   std::vector<Real> step_sizes;
+
    // Methods called by specific states of the finite state machine
    virtual void PrepareToEstimate();
    virtual void Propagate();
@@ -129,6 +132,7 @@ protected:
    virtual void Estimate();
    void Accumulate();
    void CheckConvergence();
+   void ReportStepStats();
    void Finalize();
 
    // Helper methods

@@ -64,13 +64,24 @@
  * Default constructor
  */
 //------------------------------------------------------------------------------
-EphemWriterSTK::EphemWriterSTK(const std::string &name, const std::string &type) :
+EphemWriterSTK::EphemWriterSTK(const std::string &name, const std::string &type, const std::string &version) :
    EphemWriterWithInterpolator(name, type),
    stkEphemFile     (NULL),
-   stkVersion       ("stk.v.10.0"),
+   stkVersion       (version),
    stkWriteFailed   (true)
 {
    fileType = STK_TIMEPOSVEL;
+
+   if (stkVersion == "")
+      stkVersion = "stk.v.10.0";
+
+   if (stkVersion != "stk.v.10.0")
+   {
+      SubscriberException se;
+      se.SetDetails("**** ERROR **** Invalid STK version : '%s'\n",
+         stkVersion.c_str());
+      throw se;
+   }
 }
 
 
@@ -225,11 +236,10 @@ void EphemWriterSTK::Copy(const EphemerisWriter* orig)
 //--------------------------------------
 
 //------------------------------------------------------------------------------
-// void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real accel[3])
+// void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[4])
 //------------------------------------------------------------------------------
 void EphemWriterSTK::BufferOrbitData(Real epochInDays, const Real state[6],
-                                     const Real cov[21], const Real accel[3],
-                                     const Real quat[4])
+                                     const Real cov[21], const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_BUFFER
    MessageInterface::ShowMessage
@@ -250,18 +260,13 @@ void EphemWriterSTK::BufferOrbitData(Real epochInDays, const Real state[6],
    Rvector *covar = new Rvector(21);
    covar->Set((Real *)cov, 21);
    covArray.push_back(covar);
-   
-   Rvector3 *acc = new Rvector3(accel[0], accel[1], accel[2]);
-   accelArray.push_back(acc);
 
-   Rvector *rvacov = new Rvector(30);
+   Rvector *rvcov = new Rvector(27);
    for (Integer i = 0; i < 6; ++i)
-      (*rvacov)[i] = state[i];
-   for (Integer i = 0; i < 6; ++i)
-      (*rvacov)[i+6] = accel[i];
+      (*rvcov)[i] = state[i];
    for (Integer i = 0; i < 21; ++i)
-      (*rvacov)[i] = cov[i];
-   rvacovArray.push_back(rvacov);
+      (*rvcov)[i + 6] = cov[i];
+   rvcovArray.push_back(rvcov);
 
    #ifdef DEBUG_EPHEMFILE_BUFFER
    MessageInterface::ShowMessage
@@ -493,7 +498,7 @@ void EphemWriterSTK::HandleOrbitData()
    #endif
    
    // Check if it is time to write
-   bool timeToWrite = IsTimeToWrite(currEpochInSecs, currState, currCov, currAccel);
+   bool timeToWrite = IsTimeToWrite(currEpochInSecs, currState, currCov, currQuat, currAccel);
    
    #if DBGLVL_EPHEMFILE_DATA > 0
    MessageInterface::ShowMessage

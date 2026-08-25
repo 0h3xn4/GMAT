@@ -64,10 +64,6 @@ public:
    bool              SetState(const Real *data, const Integer size, 
                               const Integer start = 0);
 
-   Real*             GetStateDot(); 
-   bool              SetStateDot(const Real *dataDot, const Integer size, 
-                                 const Integer start = 0);
-
    GmatEpoch         GetEpoch() const;
    GmatTime          GetEpochGT() const;
    GmatEpoch         SetEpoch(const GmatEpoch ep);
@@ -90,9 +86,6 @@ protected:
 
    /// The state data
    Real              *theData;
-
-   /// The state data's first derivative w.r.t. time 
-   Real              *theDataDot; 
 
    Integer           *dataIDs;
    Integer           *associatedElements;

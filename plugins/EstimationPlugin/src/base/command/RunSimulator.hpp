@@ -109,11 +109,15 @@ protected:
    /// Time different used while running the event code
    Real dt;
 
+  // For statitistics
+   std::vector<Real> step_sizes;
+
    void PrepareToSimulate();
    void Propagate();
    void Calculate();
    void LocateEvent();
    void Simulate();
+   void ReportStepStats();
    void Finalize();
 
    void SetPropagationProperties(PropagationStateManager *psm);

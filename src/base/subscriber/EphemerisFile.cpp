@@ -98,29 +98,26 @@ StringArray EphemerisFile::eventBoundariesList;
 const std::string
 EphemerisFile::PARAMETER_TEXT[EphemerisFileParamCount - SubscriberParamCount] =
 {
-   "Spacecraft",            // SPACECRAFT
-   "Filename",              // FILENAME
-   "FullPathFileName",      // FULLPATH_FILENAME
-   "FileFormat",            // FILE_FORMAT
-
-   "FileFormatVersion",     // FILE_FORMAT_VERSION
-   "AddingAccelerationOption",  // ADDING_ACCELERATION_OPTION
-   "AddingCovarianceOption",    // ADDING_ACCELERATION_OPTION
-   
-   "EpochFormat",           // EPOCH_FORMAT
-   "InitialEpoch",          // INITIAL_EPOCH
-   "FinalEpoch",            // FINAL_EPOCH
-   "StepSize",              // STEP_SIZE
-   "Interpolator",          // INTERPOLATOR
-   "InterpolationOrder",    // INTERPOLATION_ORDER
-   "StateType",             // STATE_TYPE
-   "CoordinateSystem",      // COORDINATE_SYSTEM
-   "OutputFormat",          // OUTPUT_FORMAT
-   "IncludeCovariance",     // INCLUDE_COVARIANCE
-   "WriteEphemeris",        // WRITE_EPHEMERIS
-   "FileName",              // FILE_NAME - deprecated
-   "DistanceUnit",          // DISTANCE_UNIT
-   "IncludeEventBoundaries" // INCLUDE_EVENT_BOUNDARIES
+   "Spacecraft",             // SPACECRAFT
+   "Filename",               // FILENAME
+   "FullPathFileName",       // FULLPATH_FILENAME
+   "FileFormat",             // FILE_FORMAT
+   "EpochFormat",            // EPOCH_FORMAT
+   "InitialEpoch",           // INITIAL_EPOCH
+   "FinalEpoch",             // FINAL_EPOCH
+   "StepSize",               // STEP_SIZE
+   "Interpolator",           // INTERPOLATOR
+   "InterpolationOrder",     // INTERPOLATION_ORDER
+   "StateType",              // STATE_TYPE
+   "CoordinateSystem",       // COORDINATE_SYSTEM
+   "OutputFormat",           // OUTPUT_FORMAT
+   "IncludeCovariance",      // INCLUDE_COVARIANCE
+   "WriteEphemeris",         // WRITE_EPHEMERIS
+   "FileName",               // FILE_NAME - deprecated
+   "DistanceUnit",           // DISTANCE_UNIT
+   "IncludeEventBoundaries", // INCLUDE_EVENT_BOUNDARIES
+   "FormatVersion",          // FORMAT_VERSION
+   "AccelerationModel"       // ACCELERATION_MODEL
 };
 
 const Gmat::ParameterType
@@ -130,11 +127,6 @@ EphemerisFile::PARAMETER_TYPE[EphemerisFileParamCount - SubscriberParamCount] =
    Gmat::FILENAME_TYPE,     // FILENAME
    Gmat::FILENAME_TYPE,     // FULLPATH_FILENAME
    Gmat::ENUMERATION_TYPE,  // FILE_FORMAT
-   
-   Gmat::STRING_TYPE,       // FILE_FORMAT_VERSION
-   Gmat::BOOLEAN_TYPE,      // ADDING_ACCELERATION_OPTION
-   Gmat::BOOLEAN_TYPE,      // ADDING_COVRAIANCE_OPTION
-
    Gmat::ENUMERATION_TYPE,  // EPOCH_FORMAT
    Gmat::ENUMERATION_TYPE,  // INITIAL_EPOCH
    Gmat::ENUMERATION_TYPE,  // FINAL_EPOCH
@@ -149,6 +141,8 @@ EphemerisFile::PARAMETER_TYPE[EphemerisFileParamCount - SubscriberParamCount] =
    Gmat::STRING_TYPE,       // FILE_NAME - deprecated
    Gmat::ENUMERATION_TYPE,  // DISTANCE_UNIT
    Gmat::BOOLEAN_TYPE,      // INCLUDE_EVENT_BOUNDARIES
+   Gmat::STRING_TYPE,       // FORMAT_VERSION
+   Gmat::OBJECT_TYPE,       // ACCELERATION_MODEL
 };
 
 
@@ -163,6 +157,7 @@ EphemerisFile::EphemerisFile(const std::string &name, const std::string &type) :
    Subscriber              (type, name),
    spacecraft              (NULL),
    outCoordSystem          (NULL),
+   accelModel              (NULL),
    ephemWriter             (NULL),
    fullPathFileName        (""),
    spacecraftName          (""),
@@ -170,11 +165,6 @@ EphemerisFile::EphemerisFile(const std::string &name, const std::string &type) :
    prevFileName            (""),
    fileName                (""),
    fileFormat              ("CCSDS-OEM"),
-   
-   fileFormatVersion       ("1.0"),
-   addingAccelerationOption(true),
-   addingCovarianceOption  (true),
-
    epochFormat             ("UTCGregorian"),
    initialEpochStr         ("InitialSpacecraftEpoch"),
    finalEpochStr           ("FinalSpacecraftEpoch"),
@@ -184,6 +174,8 @@ EphemerisFile::EphemerisFile(const std::string &name, const std::string &type) :
    outCoordSystemName      ("EarthMJ2000Eq"),
    outputFormat            ("LittleEndian"),
    covFormat               ("None"),
+   formatVersion           (""),
+   accelModelName          (""),
    writeEphemeris          (true),
    usingDefaultFileName    (true),
    generateInBackground    (false),
@@ -211,7 +203,8 @@ EphemerisFile::EphemerisFile(const std::string &name, const std::string &type) :
    canFinalize             (false),
    fileType                (UNKNOWN_FILE_TYPE),
    distanceUnit            ("Kilometers"),
-   includeEventBoundaries  (true)
+   includeEventBoundaries  (true),
+   transients              (NULL)
 {
    #ifdef DEBUG_EPHEMFILE_INSTANCE
    MessageInterface::ShowMessage
@@ -339,6 +332,7 @@ EphemerisFile::EphemerisFile(const EphemerisFile &ef) :
    Subscriber              (ef),
    spacecraft              (ef.spacecraft),
    outCoordSystem          (ef.outCoordSystem),
+   accelModel              (ef.accelModel),
    ephemWriter             (NULL),
    fullPathFileName        (ef.fullPathFileName),
    spacecraftName          (ef.spacecraftName),
@@ -346,11 +340,6 @@ EphemerisFile::EphemerisFile(const EphemerisFile &ef) :
    prevFileName            (ef.prevFileName),
    fileName                (ef.fileName),
    fileFormat              (ef.fileFormat),
-   
-   fileFormatVersion       (ef.fileFormatVersion),
-   addingAccelerationOption(ef.addingAccelerationOption),
-   addingCovarianceOption  (ef.addingCovarianceOption),
-
    epochFormat             (ef.epochFormat),
    initialEpochStr         (ef.initialEpochStr),
    finalEpochStr           (ef.finalEpochStr),
@@ -360,6 +349,8 @@ EphemerisFile::EphemerisFile(const EphemerisFile &ef) :
    outCoordSystemName      (ef.outCoordSystemName),
    outputFormat            (ef.outputFormat),
    covFormat               (ef.covFormat),
+   formatVersion           (ef.formatVersion),
+   accelModelName          (ef.accelModelName),
    writeEphemeris          (ef.writeEphemeris),
    usingDefaultFileName    (ef.usingDefaultFileName),
    generateInBackground    (ef.generateInBackground),
@@ -386,7 +377,8 @@ EphemerisFile::EphemerisFile(const EphemerisFile &ef) :
    isEphemFileOpened       (ef.isEphemFileOpened),
    canFinalize             (ef.canFinalize),
    distanceUnit            (ef.distanceUnit),
-   includeEventBoundaries  (ef.includeEventBoundaries)
+   includeEventBoundaries  (ef.includeEventBoundaries),
+   transients              (ef.transients)
 {
    #ifdef DEBUG_EPHEMFILE_INSTANCE
    MessageInterface::ShowMessage
@@ -417,6 +409,7 @@ EphemerisFile& EphemerisFile::operator=(const EphemerisFile& ef)
    
    spacecraft           = ef.spacecraft;
    outCoordSystem       = ef.outCoordSystem;
+   accelModel           = ef.accelModel;
    ephemWriter          = NULL;
    fullPathFileName     = ef.fullPathFileName;
    spacecraftName       = ef.spacecraftName;
@@ -424,11 +417,6 @@ EphemerisFile& EphemerisFile::operator=(const EphemerisFile& ef)
    prevFileName         = ef.prevFileName;
    fileName             = ef.fileName;
    fileFormat           = ef.fileFormat;
-   
-   fileFormatVersion    = ef.fileFormatVersion;
-   addingAccelerationOption = ef.addingAccelerationOption;
-   addingCovarianceOption   = ef.addingCovarianceOption;
-   
    epochFormat          = ef.epochFormat;
    initialEpochStr      = ef.initialEpochStr;
    finalEpochStr        = ef.finalEpochStr;
@@ -438,6 +426,8 @@ EphemerisFile& EphemerisFile::operator=(const EphemerisFile& ef)
    outCoordSystemName   = ef.outCoordSystemName;
    outputFormat         = ef.outputFormat;
    covFormat            = ef.covFormat;
+   formatVersion        = ef.formatVersion;
+   accelModelName       = ef.accelModelName;
    writeEphemeris       = ef.writeEphemeris;
    usingDefaultFileName = ef.usingDefaultFileName;
    generateInBackground = ef.generateInBackground;
@@ -465,6 +455,7 @@ EphemerisFile& EphemerisFile::operator=(const EphemerisFile& ef)
    canFinalize          = ef.canFinalize;
    distanceUnit         = ef.distanceUnit;
    includeEventBoundaries = ef.includeEventBoundaries;
+   transients           = ef.transients;
    return *this;
 }
 
@@ -877,6 +868,11 @@ bool EphemerisFile::RenameRefObject(const UnsignedInt type,
       if (outCoordSystemName == oldName)
          outCoordSystemName = newName;
    }
+   else if (type == Gmat::ODE_MODEL)
+   {
+      if (accelModelName == oldName)
+         accelModelName = newName;
+   }
    
    return Subscriber::RenameRefObject(type, oldName, newName);
 }
@@ -966,65 +962,7 @@ bool EphemerisFile::IsParameterReadOnly(const Integer id) const
       if (fileFormat != "STK-TimePosVel")
          return true;
 
-   //if (GmatGlobal::Instance()->GetRunMode() == GmatGlobal::TESTING)          // made changes by TUAN NGUYEN
-   if (GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING)     // made changes by TUAN NGUYEN
-   {
-      // Allow reading and writing when it runs in TESTING mode
-      if (id == FILE_FORMAT_VERSION)
-         return false;
-      if (id == ADDING_ACCELERATION_OPTION)
-         return false;
-      if (id == ADDING_COVARIANCE_OPTION)
-         return false;
-   }
-   else
-   {
-      // Allow reading only when it runs in NORMAL mode
-      if (id == FILE_FORMAT_VERSION)
-         return true;
-      if (id == ADDING_ACCELERATION_OPTION)
-         return true;
-      if (id == ADDING_COVARIANCE_OPTION)
-         return true;
-   }
-
    return Subscriber::IsParameterReadOnly(id);
-}
-
-
-
-//---------------------------------------------------------------------------
-//  bool IsParameterCloaked(const Integer id) const
-//---------------------------------------------------------------------------
-/**
- * Checks to see if the requested parameter is cloaked.
- *
- * @param <id> ID for the parameter.
- *
- * @return true if the parameter is cloaked, false if not
- */
- //---------------------------------------------------------------------------
-bool EphemerisFile::IsParameterCloaked(const Integer id) const
-{
-   //if (GmatGlobal::Instance()->GetRunMode() == GmatGlobal::TESTING)          // made changes by TUAN NGUYEN
-   if (GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING)     // made changes by TUAN NGUYEN
-   {
-      // Allow to show, write, or the script for these parameters in TESTING mode
-      if (id == FILE_FORMAT_VERSION ||
-         id == ADDING_ACCELERATION_OPTION ||
-         id == ADDING_COVARIANCE_OPTION)
-         return false;
-   }
-   else
-   {
-      // Disable to show, write, or the script for these parameters in NORMAL mode
-      if (id == FILE_FORMAT_VERSION ||
-         id == ADDING_ACCELERATION_OPTION ||
-         id == ADDING_COVARIANCE_OPTION)
-         return true;
-   }
-
-   return Subscriber::IsParameterCloaked(id);
 }
 
 
@@ -1076,6 +1014,8 @@ UnsignedInt EphemerisFile::GetPropertyObjectType(const Integer id) const
       return Gmat::INTERPOLATOR;
    case COORDINATE_SYSTEM:
       return Gmat::COORDINATE_SYSTEM;
+   case ACCELERATION_MODEL:
+      return Gmat::ODE_MODEL;
    default:
       return Subscriber::GetPropertyObjectType(id);
    }
@@ -1134,12 +1074,6 @@ bool EphemerisFile::GetBooleanParameter(const Integer id) const
       return writeEphemeris;
    case INCLUDE_EVENT_BOUNDARIES:
       return includeEventBoundaries;
-
-   case ADDING_ACCELERATION_OPTION:
-      return addingAccelerationOption;
-   case ADDING_COVARIANCE_OPTION:
-      return addingCovarianceOption;
-   
    default:
       return Subscriber::GetBooleanParameter(id);
    }
@@ -1170,27 +1104,6 @@ bool EphemerisFile::SetBooleanParameter(const Integer id, const bool value)
    case INCLUDE_EVENT_BOUNDARIES:
       includeEventBoundaries = value;
       return includeEventBoundaries;
-
-   case ADDING_ACCELERATION_OPTION:
-   {
-      //MessageInterface::ShowMessage("********   ADDING_ACCELERATION_OPTION:  value = %s   GetRunMode() = %d\n", (value?"true":"false"), GmatGlobal::Instance()->GetRunMode());
-      //if (GmatGlobal::Instance()->GetRunMode() == GmatGlobal::TESTING)       // made changes by TUAN NGUYEN
-      if (GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING)  // made changes by TUAN NGUYEN
-      {
-         addingAccelerationOption = value;
-         return addingAccelerationOption;
-      }
-   }
-   case ADDING_COVARIANCE_OPTION:
-   {
-      //MessageInterface::ShowMessage("********   ADDING_COVARIANCE_OPTION:  value = %s   GetRunMode() = %d\n", (value ? "true" : "false"), GmatGlobal::Instance()->GetRunMode());
-      //if (GmatGlobal::Instance()->GetRunMode() == GmatGlobal::TESTING)            // made changes by TUAN NGUYEN
-      if (GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING)       // made changes by TUAN NGUYEN
-      {
-         addingCovarianceOption = value;
-         return addingCovarianceOption;
-      }
-   }
    default:
       return Subscriber::SetBooleanParameter(id, value);
    }
@@ -1276,8 +1189,6 @@ std::string EphemerisFile::GetStringParameter(const Integer id) const
       return fullPathFileName;
    case FILE_FORMAT:
       return fileFormat;
-   case FILE_FORMAT_VERSION:
-      return fileFormatVersion;
    case EPOCH_FORMAT:
       return epochFormat;
    case INITIAL_EPOCH:
@@ -1296,11 +1207,15 @@ std::string EphemerisFile::GetStringParameter(const Integer id) const
       return outputFormat;
    case INCLUDE_COVARIANCE:
       return covFormat;
+   case FORMAT_VERSION:
+      return formatVersion;
    case FILE_NAME:
       WriteDeprecatedMessage(id);
       return fileName;
    case DISTANCE_UNIT:
       return distanceUnit;
+   case ACCELERATION_MODEL:
+      return accelModelName;
    default:
       return Subscriber::GetStringParameter(id);
    }
@@ -1452,23 +1367,6 @@ bool EphemerisFile::SetStringParameter(const Integer id, const std::string &valu
       {
          HandleError(FILE_FORMAT, value, fileFormatList);
       }
-   case FILE_FORMAT_VERSION:
-      ///@todo: check for testing mode will be removed when all CCSDS OEM v2 test cases are passed.
-      //if (GmatGlobal::Instance()->GetRunMode() == GmatGlobal::TESTING)            // made changes by TUAN NGUYEN
-      if (GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING)       // made changes by TUAN NGUYEN
-      {
-         if (value != "1.0" && value != "2.0")
-         {
-            SubscriberException se;
-            se.SetDetails("The Only Permitted CCSDS-File Format Values are \"1.0\" and \"2.0\"");
-            throw se;
-         }
-         fileFormatVersion = value;
-         return true;
-      }
-      else
-         return false;
-      break;
    case EPOCH_FORMAT:
       if (find(epochFormatList.begin(), epochFormatList.end(), value) !=
           epochFormatList.end())
@@ -1613,6 +1511,10 @@ bool EphemerisFile::SetStringParameter(const Integer id, const std::string &valu
       {
          HandleError(INCLUDE_COVARIANCE, value, covFormatList);
       }
+   case FORMAT_VERSION:
+      formatVersion = value;
+
+      return true;
    case FILE_NAME:
       WriteDeprecatedMessage(id);
       return SetStringParameter(FILENAME, value);
@@ -1627,6 +1529,9 @@ bool EphemerisFile::SetStringParameter(const Integer id, const std::string &valu
       {
          HandleError(DISTANCE_UNIT, value, distanceUnitList);
       }
+   case ACCELERATION_MODEL:
+      accelModelName = value;
+      return true;
    default:
       return Subscriber::SetStringParameter(id, value);
    }
@@ -1656,6 +1561,9 @@ GmatBase* EphemerisFile::GetRefObject(const UnsignedInt type,
    
    if (type == Gmat::COORDINATE_SYSTEM)
       return outCoordSystem;
+
+   if (type == Gmat::ODE_MODEL)
+      return accelModel;
    
    return Subscriber::GetRefObject(type, name);
 }
@@ -1698,6 +1606,14 @@ bool EphemerisFile::SetRefObject(GmatBase *obj, const UnsignedInt type,
       
       return true;
    }
+   else if (type == Gmat::ODE_MODEL && name == accelModelName)
+   {
+      accelModel = (ODEModel*)obj;
+      if (accelModel && ephemWriter)
+          ephemWriter->SetAccelModel(accelModel);
+
+      return true;
+   }
    
    return Subscriber::SetRefObject(obj, type, name);
 }
@@ -1715,10 +1631,36 @@ const StringArray& EphemerisFile::GetRefObjectNameArray(const UnsignedInt type)
    
    if (type == Gmat::COORDINATE_SYSTEM || type == Gmat::UNKNOWN_OBJECT)
       refObjectNames.push_back(outCoordSystemName);
+
+   if (type == Gmat::PHYSICAL_MODEL || type == Gmat::UNKNOWN_OBJECT)
+      refObjectNames.push_back(accelModelName);
    
    return refObjectNames;
 }
 
+//---------------------------------------------------------------------------
+//  bool IsParameterCloaked(const Integer id) const
+//---------------------------------------------------------------------------
+/**
+* Checks to see if the requested parameter is cloaked
+*
+* @param <id> Description for the parameter.
+*
+* @return true if the parameter is cloaked
+*/
+//---------------------------------------------------------------------------
+bool EphemerisFile::IsParameterCloaked(const Integer id) const
+{
+   switch (id)
+   {
+   case FORMAT_VERSION:
+      return formatVersion == "";
+   case INCLUDE_COVARIANCE:
+      return covFormat == "None";
+   default:
+      return Subscriber::IsParameterCloaked(id);
+   }
+}
 
 //--------------------------------------
 // protected methods
@@ -1857,7 +1799,32 @@ void EphemerisFile::ValidateParameters(bool forInitialization)
          }
       }
    }
-   
+
+   if (fileFormat != "CCSDS-OEM" && accelModelName != "")
+      throw SubscriberException("EphemerisFile \"" + GetName() + "\" is of type " + fileFormat + " and does not support acceleration output.");
+
+   if (fileFormat == "CCSDS-OEM")
+   {
+      if (formatVersion == "1.0")
+      {
+         if(accelModelName != "")
+            throw SubscriberException("EphemerisFile \"" + GetName() + "\" is of type CCSCS v1.0 and does not support acceleration output.");
+
+         if(covFormat != "None")
+            throw SubscriberException("EphemerisFile \"" + GetName() + "\" is of type CCSCS v1.0 and does not support covariance output.");
+      }
+      else if (formatVersion == "" || formatVersion == "2.0")
+      {
+         if (covFormat == "Position")
+            throw SubscriberException("EphemerisFile \"" + GetName() + "\" is of type CCSCS and does not support position only covariance output.");
+      }
+      else
+         throw SubscriberException("EphemerisFile \"" + GetName() + "\" has unknown version " + formatVersion + ".");
+   }
+
+   if (fileFormat == "STK-TimePosVel" && formatVersion != "" && formatVersion != "stk.v.10.0")
+      throw SubscriberException("EphemerisFile \"" + GetName() + "\" has unknown version " + formatVersion + ".");
+
    // By this time, coordinate system should not be NULL, so check it
    if (outCoordSystem == NULL)
       throw SubscriberException
@@ -2042,7 +2009,7 @@ void EphemerisFile::CreateEphemerisWriter()
    
    // Create appropriate EphemerisFile writer
    if (fileFormat == "CCSDS-OEM")
-      ephemWriter = new EphemWriterCCSDS(GetName(), fileFormat);
+      ephemWriter = new EphemWriterCCSDS(GetName(), fileFormat, formatVersion);
    else if (fileFormat == "SPK")
       ephemWriter = new EphemWriterSPK(GetName(), fileFormat);
    else if (fileFormat == "CK")
@@ -2051,7 +2018,7 @@ void EphemerisFile::CreateEphemerisWriter()
       ephemWriter = new EphemWriterCode500(GetName(), fileFormat);
    else if (fileFormat == "STK-TimePosVel")
    {
-      ephemWriter = new EphemWriterSTK(GetName(), fileFormat);
+      ephemWriter = new EphemWriterSTK(GetName(), fileFormat, formatVersion);
       ((EphemWriterSTK*)ephemWriter)->SetDistanceUnit(distanceUnit);
       ((EphemWriterSTK*)ephemWriter)->SetIncludeEventBoundaries(includeEventBoundaries);
    }
@@ -2063,10 +2030,6 @@ void EphemerisFile::CreateEphemerisWriter()
       throw se;
    }
 
-   ephemWriter->SetEphemerisFormatVersion(fileFormatVersion);
-   ephemWriter->SetAddingAccelerationOption(addingAccelerationOption);
-   ephemWriter->SetAddingCovarianceOption(addingCovarianceOption);
-
    #ifdef DEBUG_EPHEMFILE_INIT
    MessageInterface::ShowMessage("   ephemWriter<%p> created\n", ephemWriter);
    MessageInterface::ShowMessage
@@ -2077,6 +2040,7 @@ void EphemerisFile::CreateEphemerisWriter()
    ephemWriter->SetSpacecraft(spacecraft);
    ephemWriter->SetDataCoordSystem(theDataCoordSystem);
    ephemWriter->SetOutCoordSystem(outCoordSystem);
+   ephemWriter->SetAccelModel(accelModel);
    ephemWriter->SetInitialData(initialEpochStr, finalEpochStr, stepSize, stepSizeInSecs,
                                useFixedStepSize, interpolatorName, interpolationOrder);
    ephemWriter->SetInitialTime(initialEpochA1Mjd, finalEpochA1Mjd);
@@ -2180,6 +2144,13 @@ void EphemerisFile::StartNewSegment(const std::string &comments,
    #endif
 }
 
+//------------------------------------------------------------------------------
+// SetTransientForces(std::vector<PhysicalModel*>* tf)
+//------------------------------------------------------------------------------
+void EphemerisFile::SetTransientForces(std::vector<PhysicalModel*>* tf)
+{
+   transients = tf;
+}
 
 //------------------------------------------------------------------------------
 // virtual void FinishUpWriting()
@@ -2296,7 +2267,6 @@ bool EphemerisFile::RetrieveData(const Real *dat, Integer len)
    
    Integer idX, idY, idZ;
    Integer idVx, idVy, idVz;
-   Integer idAx, idAy, idAz;
    Integer idQ1, idQ2, idQ3, idQ4;
    
    idX  = FindIndexOfElement(dataLabels, spacecraftName + ".X");
@@ -2305,11 +2275,6 @@ bool EphemerisFile::RetrieveData(const Real *dat, Integer len)
    idVx = FindIndexOfElement(dataLabels, spacecraftName + ".Vx");
    idVy = FindIndexOfElement(dataLabels, spacecraftName + ".Vy");
    idVz = FindIndexOfElement(dataLabels, spacecraftName + ".Vz");
-
-   idAx = FindIndexOfElement(dataLabels, spacecraftName + ".AccelerationX");
-   idAy = FindIndexOfElement(dataLabels, spacecraftName + ".AccelerationY");
-   idAz = FindIndexOfElement(dataLabels, spacecraftName + ".AccelerationZ");
-   //MessageInterface::ShowMessage("&&&&&    idAx = %d,   idAy = %d,   idAz = %d\n", idAx, idAy, idAz);
 
    Integer idCov[21];
    UnsignedInt idx = 0;
@@ -2331,15 +2296,15 @@ bool EphemerisFile::RetrieveData(const Real *dat, Integer len)
    
    #ifdef DEBUG_EPHEMFILE_DATA_LABELS
    MessageInterface::ShowMessage
-      ("   spacecraft='%s', idX=%d, idY=%d, idZ=%d, idVx=%d, idVy=%d, idVz=%d, idAx=%d, idAy=%d, idAz=%d\n",
-       spacecraftName.c_str(), idX, idY, idZ, idVx, idVy, idVz, idAx, idAy, idAz);
+      ("   spacecraft='%s', idX=%d, idY=%d, idZ=%d, idVx=%d, idVy=%d, idVz=%d\n",
+       spacecraftName.c_str(), idX, idY, idZ, idVx, idVy, idVz);
    MessageInterface::ShowMessage(" idCov = [");
    for (Integer i = 0; i < 21; ++i)
       MessageInterface::ShowMessage("idCov[%d] = %d, ", i, idCov[i]);
    MessageInterface::ShowMessage("]\n"); 
    MessageInterface::ShowMessage
    ("idQ1=%d, idQ2=%d, idQ3=%d, idQ4=%d\n",
-      idQ1, idQ2, idQ3, idQ4, idVy, idVz, idAx, idAy, idAz);
+      idQ1, idQ2, idQ3, idQ4);
    #endif
    
    // if any of index not found, just return true
@@ -2360,8 +2325,6 @@ bool EphemerisFile::RetrieveData(const Real *dat, Integer len)
    MessageInterface::ShowMessage
       ("   %s, epoch = %.15f, state = [%.15f, %.15f, %.15f, %.15f, %.15f, %.15f]\n",
        GetName().c_str(), dat[0], dat[idX], dat[idY], dat[idZ], dat[idVx], dat[idVy], dat[idVz]);
-   MessageInterface::ShowMessage("   acceleration = [%.15le, %.15le, %.15le]\n",
-      dat[idAx], dat[idAy], dat[idAz]);
    MessageInterface::ShowMessage("   covariance = [");
    Integer index = 0;
    for (Integer row = 0; row < 6; ++row)
@@ -2390,10 +2353,6 @@ bool EphemerisFile::RetrieveData(const Real *dat, Integer len)
    currState[4] = dat[idVy];
    currState[5] = dat[idVz];
 
-   currAccel[0] = dat[idAx];
-   currAccel[1] = dat[idAy];
-   currAccel[2] = dat[idAz];
-
    for (Integer ii = 0; ii < 21; ii++)
    {
       if (idCov[ii] != -1 && idCov[ii] < len)
@@ -2412,6 +2371,32 @@ bool EphemerisFile::RetrieveData(const Real *dat, Integer len)
       ("EphemerisFile::RetrieveData() returning true for '%s'\n", GetName().c_str());
    #endif
    
+   std::vector<PhysicalModel*> forcesAdded;
+   if (accelModel)
+   {
+      if (transients != NULL)
+         for (auto force : *transients)
+         {
+            StringArray sats = force->GetRefObjectNameArray(Gmat::SPACECRAFT);
+            if (find(sats.begin(), sats.end(), spacecraft->GetName()) != sats.end())
+            {
+               accelModel->AddForce(force);
+               forcesAdded.push_back(force);
+            }
+         }
+
+      Rvector6 deriv = accelModel->GetDerivativesForSpacecraft(spacecraft);
+      currAccel[0] = deriv[3];
+      currAccel[1] = deriv[4];
+      currAccel[2] = deriv[5];
+   }
+   else
+      currAccel[0] = currAccel[1] = currAccel[2] = 0.0;
+
+   // Remove any transient forces that were added
+   for (auto force : forcesAdded)
+      accelModel->DeleteForce(force);
+
    return true;
 }
 
@@ -3102,7 +3087,7 @@ bool EphemerisFile::Distribute(const Real *dat, Integer len)
       return true;
    
    // Set data to EphemerisWriter
-   ephemWriter->SetOrbitData(currEpochInDays, currState, currCov, currAccel, currQuat);
+   ephemWriter->SetOrbitData(currEpochInDays, currState, currCov, currQuat, currAccel);
    
    // To compute block time span for use in the error message (LOJ: 2014.04.30)
    // Save block begin time

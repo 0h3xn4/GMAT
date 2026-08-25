@@ -192,8 +192,6 @@ protected:
                                              StringArray &elementNames,
                                              Integer covStartIndex,
                                              Integer attStartIndex);
-
-   void                 CalculateStateDotAtInitialEpoch();
 };
 
 #endif /* PropagationEnabledCommand_hpp */

@@ -378,7 +378,7 @@
           </row>
 
           <row>
-            <entry><guilabel>OrbitErrorCovariance</guilabel><indexterm>
+            <entry xml:id="SpacecraftNavigation_OrbitErrorCovariance"><guilabel>OrbitErrorCovariance</guilabel><indexterm>
                 <primary>OrbitErrorCovariance</primary>
               </indexterm></entry>
 

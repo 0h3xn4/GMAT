@@ -1292,9 +1292,6 @@ bool RunEstimator::Execute()
 
             UpdateInitialConditions();
 
-
-            // Calculate state dot at initial epoch
-            CalculateStateDotAtInitialEpoch();
             // copy acceleration from spacecraft to esimation gmat state vector
             esm->MapObjectsToVector();
 
@@ -1414,6 +1411,8 @@ bool RunEstimator::Execute()
             MessageInterface::ShowMessage("Entered RunEstimator::Execute(): CHECKINGRUN state\n");
          #endif
          CheckConvergence();
+         ReportStepStats();
+         step_sizes.clear();
          #ifdef DEBUG_STATE
             MessageInterface::ShowMessage("Exit RunEstimator::Execute(): CHECKINGRUN state\n");
          #endif
@@ -2002,6 +2001,9 @@ void RunEstimator::Propagate()
 
    // Ignore ephemeris gaps exceptions for TDRS measurements
    skipEphemerisProp = true;
+   if (fabs(dt) > 0)
+      step_sizes.push_back(fabs(dt));
+
    Step(dt);
    skipEphemerisProp = false;
 
@@ -2381,6 +2383,65 @@ void RunEstimator::CheckConvergence()
 }
 
 //------------------------------------------------------------------------------
+// void ReportStepStats()
+//------------------------------------------------------------------------------
+/**
+ * Produce statistics about step sizes
+ */
+//------------------------------------------------------------------------------
+void RunEstimator::ReportStepStats()
+{
+   MessageInterface::ShowMessage("Variable Step Integration Statistics (%s):\n", theEstimator->GetName().c_str());
+   if (step_sizes.size() == 0)
+   {
+      MessageInterface::ShowMessage("    0 steps taken\n");
+      return;
+   }
+
+   MessageInterface::ShowMessage("    %d steps taken\n", step_sizes.size());
+
+   Real total_steps = 0.0;
+   Real sum_of_sqrs = 0.0;
+   Real min_step_taken, max_step_taken;
+   min_step_taken = max_step_taken = step_sizes[0];
+
+   for (Real step_size : step_sizes)
+   {
+      total_steps += step_size;
+      sum_of_sqrs += step_size * step_size;
+
+      if (step_size < min_step_taken)
+         min_step_taken = step_size;
+
+      if (step_size > max_step_taken)
+         max_step_taken = step_size;
+   }
+
+   MessageInterface::ShowMessage("    Min step taken  : %f sec\n", min_step_taken);
+   MessageInterface::ShowMessage("    Max step taken  : %f sec\n", max_step_taken);
+
+   MessageInterface::ShowMessage("    Sum of steps    : %f sec\n", total_steps);
+   MessageInterface::ShowMessage("    Average step    : %f sec\n", total_steps / step_sizes.size());
+   Real std_dev = sqrt(sum_of_sqrs / step_sizes.size() - (total_steps / step_sizes.size()) * (total_steps / step_sizes.size()));
+   MessageInterface::ShowMessage("    Stddev of steps : %f sec\n", std_dev);
+
+   std::vector<Integer> histogram(10);
+   Real upper = (Integer)ceil(max_step_taken);
+
+   for (Real step_size : step_sizes)
+   {
+      if (step_size == max_step_taken)
+         ++histogram[9];
+      else
+         ++histogram[(Integer)floor(10 * step_size / max_step_taken)];
+   }
+
+   MessageInterface::ShowMessage("    Histogram:\n");
+   for (Integer i = 0; i < 10; i++)
+      MessageInterface::ShowMessage("        %6.1f - %6.1f sec : %6d\n", i * max_step_taken / 10, (i + 1) * max_step_taken / 10, histogram[i]);
+}
+
+//------------------------------------------------------------------------------
 // void Finalize()
 //------------------------------------------------------------------------------
 /**
@@ -2663,10 +2724,6 @@ void RunEstimator::CacheForceDerivatives()
       Real * state = propPsm->GetState()->GetState();
       Integer stateSize = propPsm->GetState()->GetSize();
 
-      Real * stateDot = propPsm->GetState()->GetStateDot();
-      for (Integer i = 0; i < stateSize; ++i)
-         stateDot[i] = 0.0;
-      
       ODEModel *propODE = propagators[i]->GetODEModel(); 
       if (propODE)
       {
@@ -2676,10 +2733,6 @@ void RunEstimator::CacheForceDerivatives()
             PhysicalModel *pm = propODE->GetForce(ii);
             pm->GetDerivatives(state);
             const Real *deriv = pm->GetDerivativeArray();
-
-            // Accumulate all forces
-            for (Integer i = 0; i < stateSize; ++i)
-               stateDot[i] += deriv[i];
 
             //derivs->insert(std::pair<std::string, std::vector<Real *>>(odeName, std::vector<Real *>()));
             //(*derivs)[odeName] = std::vector<Real *>(propODE->GetNumForces());
@@ -2781,32 +2834,6 @@ void RunEstimator::UpdateCov()
                (((*map)[esmIdx]->elementName == "CartesianState") || 
                ((*map)[esmIdx]->elementName == "KeplerianState")))
                break;
-         }
-
-         if (esmIdx < map->size())
-         {
-            // Publish acceleration
-            // Specify acceleration in spacecraft's coordinate origin MJ2000Eq coordinate system
-            Rvector3 accel = esm->GetAccelerationOfSpacecraft(sats[satIdx]);
-
-            #ifdef DEBUG_PUBLISH_STATE_DATA
-            MessageInterface::ShowMessage(" accel = [%.15le   %.15le   %.15le]\n",
-               accel[0], accel[1], accel[2]);
-            #endif
-
-            for (Integer k = 0; k < 3; ++k)
-            {
-               if (theDim + idx >= pubdataSize)
-               {
-                  std::stringstream ss;
-                  ss << "Error: data overflow in RunEstimator::PublishState() function."
-                     << " When GMAT fills acceleration data to pubdata.\n";
-                  throw GmatBaseException(ss.str());
-               }
-
-               pubdata[theDim + idx] = accel[k];
-               ++idx;
-            }
          }
       }
    }

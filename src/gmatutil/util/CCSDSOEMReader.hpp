@@ -74,6 +74,8 @@ protected:
    virtual bool            IsValidVersion(const std::string &versionValue) const;
 
    virtual bool            ParseFile();
+   bool ParseFile_v1();
+   bool ParseFile_v2();
 };
 
 #endif // CCSDSOEMReader_hpp

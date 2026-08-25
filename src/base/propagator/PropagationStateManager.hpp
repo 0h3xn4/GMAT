@@ -94,9 +94,6 @@ protected:
    GmatTime timeBeforeLastUpdateGT;
    GmatTime timeAtLastUpdateGT;
    std::map<std::string, Rmatrix> covPropStorageMap;
-
-private:
-   Integer cartesianStateID;
 };
 
 #endif /*PropagationStateManager_hpp*/

@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <chapter version="5.0" xml:id="FilterSmoother_GpsPosVec"
-         xmlns="http://docbook.org/ns/docbook"
-         xmlns:xlink="http://www.w3.org/1999/xlink"
-         xmlns:xi="http://www.w3.org/2001/XInclude"
-         xmlns:svg="http://www.w3.org/2000/svg"
-         xmlns:m="http://www.w3.org/1998/Math/MathML"
-         xmlns:html="http://www.w3.org/1999/xhtml"
-         xmlns:db="http://docbook.org/ns/docbook">
+         xmlns="http://docbook.org/ns/docbook">
   <title>Filter and Smoother Orbit Determination using GPS_PosVec Data</title>
 
   <variablelist>
@@ -418,11 +412,6 @@ FM.ErrorControl                      = None;
     specify the full path. Using a daily updated version of this file is a
     best practice for orbit determination of low-earth satellites affected by
     drag.</para>
-
-    <para>It’s worth mentioning that the setting <literal>FM.ErrorControl =
-    None</literal> forces GMAT to use fixed-step integration when propagating
-    the orbit. This is currently required for orbit determination using
-    GMAT.</para>
 
     <para>We’re almost there, just a few more objects to create. We’ll
     configure the propagator now.</para>
@@ -1897,10 +1886,12 @@ RunSmoother FPS;
 
     <note>
       <para>The covariance stored in the warm start file is actually the
-      square root of the full covariance matrix. The headers of the covariance
-      columns indicate this (SqrtCovariance). The full covariance matrix P may
-      be recovered from the square root covariance by the formula P =
-      SqrtCovariance * SqrtCovariance<superscript>T</superscript>.</para>
+      lower-triangular square root of the full covariance matrix. The headers
+      of the covariance columns indicate this (SqrtCovariance). The full
+      covariance matrix P may be recovered from the square root covariance by
+      the formula P = SqrtCovariance *
+      SqrtCovariance<superscript>T</superscript>, where SqrtCovariance is
+      assembled in lower-triangular format.</para>
     </note>
 
     <para>Let’s go through a quick demonstration of how to perform a warm
@@ -2118,7 +2109,7 @@ EKF.MatlabFile           = 'filter.mat';
     </screenshot>
 
     <para>Where <inlineequation>
-        <m:math display="inline">
+        <m:math display="inline" xmlns:m="http://www.w3.org/1998/Math/MathML">
           <m:msub>
             <m:mi>σ</m:mi>
 

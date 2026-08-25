@@ -51,6 +51,7 @@
 
 #include "utildefs.hpp"
 #include "Rvector.hpp"
+#include "Rvector3.hpp"
 
 /// struct hold a covariance record
 struct CovarianceRecord

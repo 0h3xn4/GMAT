@@ -38,7 +38,7 @@
 class GMAT_API EphemWriterCCSDS : public EphemWriterWithInterpolator
 {
 public:
-   EphemWriterCCSDS(const std::string &name, const std::string &type = "EphemWriterCCSDS");
+   EphemWriterCCSDS(const std::string &name, const std::string& type = "EphemWriterCCSDS", const std::string& version = "1.0");
    virtual ~EphemWriterCCSDS();
    EphemWriterCCSDS(const EphemWriterCCSDS &);
    EphemWriterCCSDS& operator=(const EphemWriterCCSDS&);
@@ -83,9 +83,8 @@ protected:
    bool        saveMetaDataStart;
    
    // Abstract methods required by all subclasses
-   // virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21]);
    virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21],
-                                const Real accel[3], const Real quat[4]);
+                                const Real quat[4], const Real accel[3]);
    
    
    // Data

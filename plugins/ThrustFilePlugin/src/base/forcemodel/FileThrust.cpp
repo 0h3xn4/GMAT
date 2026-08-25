@@ -1602,6 +1602,9 @@ bool FileThrust::GetDerivatives(Real* state, Real dt, Integer order,
 Rvector6 FileThrust::GetDerivativesForSpacecraft(Spacecraft* sc)
 {
    Rvector6 dv;
+
+   MessageInterface::ShowMessage("Warning: Acceleration calculation is not implemented for Thrust Files.\n");
+
    return dv;
 }
 

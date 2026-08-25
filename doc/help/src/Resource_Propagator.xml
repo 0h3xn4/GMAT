@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry version="5.0" xml:id="Propagator"
-          xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude"
-          xmlns:svg="http://www.w3.org/2000/svg"
-          xmlns:m="http://www.w3.org/1998/Math/MathML"
-          xmlns:html="http://www.w3.org/1999/xhtml"
-          xmlns:db="http://docbook.org/ns/docbook">
+          xmlns="http://docbook.org/ns/docbook">
   <indexterm>
     <primary>Propagator</primary>
   </indexterm>
@@ -1516,10 +1510,11 @@ Propagate aProp(aSat) {aSat.ElapsedDays = .2}</code></programlisting>
         must add the SPK kernels to the <guilabel>Spacecraft</guilabel> and
         define the spacecraft's <guilabel>NAIFId</guilabel>. SPK Kernels for
         selected spacecraft are available <link
-        xlink:href="http://naif.jpl.nasa.gov/naif/data_archived.html">here.</link>
-        Two sample vehicle spk kernels, (GEOSat.bsp and MoonTransfer.bsp) are
-        distributed with GMAT for example purposes. An example of how to add
-        spacecraft kernels via the script interface is shown below.</para>
+        xlink:href="http://naif.jpl.nasa.gov/naif/data_archived.html"
+        xmlns:xlink="http://www.w3.org/1999/xlink">here.</link> Two sample
+        vehicle spk kernels, (GEOSat.bsp and MoonTransfer.bsp) are distributed
+        with GMAT for example purposes. An example of how to add spacecraft
+        kernels via the script interface is shown below.</para>
 
         <programlisting><code>Create Spacecraft aSpacecraft
 aSpacecraft.NAIFId               = -123456789
@@ -1799,6 +1794,11 @@ Propagate spkProp(aSpacecraft) {aSpacecraft.ElapsedDays = 12}</code></programlis
       propagator can read Code500 ephemeris files in either endian format. The
       endian format of the ephemeris file will be automatically detected by
       GMAT.</para>
+
+      <note>
+        <para>The Code500 ephemeris format is deprecated in GMAT. Use of
+        CCSDS-OEM is recommended instead.</para>
+      </note>
 
       <para><phrase role="ref_seealso">See Also</phrase>: <xref
       linkend="Spacecraft"/>, <xref linkend="Propagate"/>, <xref
@@ -2882,8 +2882,7 @@ EndWhile;</code></programlisting>
       Committee for Space Data Systems Orbit Data Messages standard (CCSDS
       502.0-B-2). As discussed in the <xref linkend="EphemerisFile"/> help,
       GMAT can generate OEM ephemeris files using the
-      <guilabel>EphemerisFile.OutputFormat</guilabel> field. GMAT currently
-      only supports Version 1.0 OEM ephemeris files.</para>
+      <guilabel>EphemerisFile.OutputFormat</guilabel> field.</para>
 
       <para><phrase role="ref_seealso">See Also</phrase>: <xref
       linkend="Spacecraft"/>, <xref linkend="Propagate"/>, <xref
@@ -2948,7 +2947,7 @@ EndWhile;</code></programlisting>
                     <term>Access</term>
 
                     <listitem>
-                      <para>set</para>
+                      <para>Set</para>
                     </listitem>
                   </varlistentry>
 
@@ -3012,7 +3011,7 @@ EndWhile;</code></programlisting>
                     <term>Access</term>
 
                     <listitem>
-                      <para>set</para>
+                      <para>Set</para>
                     </listitem>
                   </varlistentry>
 
@@ -3070,7 +3069,7 @@ EndWhile;</code></programlisting>
                     <term>Access</term>
 
                     <listitem>
-                      <para>set</para>
+                      <para>Set</para>
                     </listitem>
                   </varlistentry>
 
@@ -3209,7 +3208,7 @@ EndWhile;</code></programlisting>
       interpolated values.</para>
 
       <para>For segmented ephemerides, the interpolator restarts at segment
-      boundaries. If an ephemeris segment has fewer than 8 points, the
+      boundaries. If an ephemeris segment has fewer than eight points, the
       interpolator activates derivative information for the position
       interpolation by including the velocity data for the interpolation. The
       order of the interpolator changes to match the number of points in the
@@ -3240,6 +3239,10 @@ EndWhile;</code></programlisting>
       <guilabel>Axes</guilabel>. Any OEM reference frame not specifically
       mentioned below is not supported for an OEM ephemeris propagator.</para>
 
+      <para>GMAT can read an OEM Version 2 ephemeris containing acceleration
+      and covariance records, but this information is ignored by GMAT and not
+      used in any processing.</para>
+
       <informaltable>
         <tgroup cols="3">
           <colspec colwidth="237*"/>
@@ -3264,7 +3267,8 @@ EndWhile;</code></programlisting>
 
               <entry>MJ2000Eq</entry>
 
-              <entry>Supported for all central bodies</entry>
+              <entry>Supported for OEM Version 1 and 2 for all central
+              bodies</entry>
             </row>
 
             <row>
@@ -3272,7 +3276,7 @@ EndWhile;</code></programlisting>
 
               <entry>TODEq</entry>
 
-              <entry>Supported for Earth only</entry>
+              <entry>Supported for OEM Version 1 and Earth only</entry>
             </row>
 
             <row>
@@ -3280,7 +3284,7 @@ EndWhile;</code></programlisting>
 
               <entry>BodyFixed</entry>
 
-              <entry>Supported for Earth only</entry>
+              <entry>Supported for OEM Version 1 and Earth only</entry>
             </row>
           </tbody>
         </tgroup>

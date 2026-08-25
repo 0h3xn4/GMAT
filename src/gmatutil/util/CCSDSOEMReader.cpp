@@ -179,20 +179,8 @@ CCSDSOEMSegment* CCSDSOEMReader::CreateNewSegment(const std::string version,
 bool CCSDSOEMReader::IsValidVersion(const std::string &versionValue) const
 {
    // Only version allowed right now are 1.0 and 2.0 
-   if (versionValue == "1.0")
+   if (versionValue == "1.0" || versionValue == "2.0")
       return true;
-
-   if (versionValue == "2.0")
-   {
-      //if (GmatGlobal::Instance()->GetRunMode() == GmatGlobal::TESTING)          // made changes by TUAN NGUYEN
-      if (GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING)     // made changes by TUAN NGUYEN
-         return true;
-      else
-      {
-         throw UtilityException("Error: Usage of CCSDS OEM v2 ephemeris data file is only allowed for running in TESTING mode.\n");
-         return false;
-      }
-   }
 
    return false;
 }
@@ -278,15 +266,6 @@ bool CCSDSOEMReader::ParseFile()
       std::string versionValue;
       lineStr >> versionValue;
 
-      // This verify of value is not needed. The version is verified by IsValidVersion() function
-      //if (!GmatStringUtil::IsNumber(versionValue))
-      //{
-      //   std::string errmsg = "Error reading ephemeris message file \"";
-      //   errmsg += emFile + "\".  ";
-      //   errmsg += "Version number is not a valid real number.\n";
-      //   throw UtilityException(errmsg);
-      //}
-
       if (!IsValidVersion(versionValue))
       {
          std::string errmsg = "Error reading ephemeris message file \"";
@@ -305,6 +284,21 @@ bool CCSDSOEMReader::ParseFile()
       throw UtilityException(errmsg);
    }
 
+   bool ret_val;
+   if (versionNumber == "1.0")
+      ret_val = ParseFile_v1();
+   else // versionNumber == "2.0"
+      ret_val = ParseFile_v2();
+
+   if (ephFile.is_open())
+      ephFile.close();
+
+   return ret_val;
+}
+
+bool CCSDSOEMReader::ParseFile_v1()
+{
+   std::string   line;
    // Read the rest of the header
    std::string   keyWord, keyAllCaps, sVal, sVal2, metaComment, dataComment, covComment;
    bool          readingMeta = false;
@@ -312,6 +306,11 @@ bool CCSDSOEMReader::ParseFile()
    bool          readingCovariance = false;
    bool          readingCovarianceMeta = false;
    bool          readingCovarianceData = false;
+
+   // Read the header data first - version number must be
+   // on the first non-blank line
+   std::string   firstWord, firstAllCaps;
+   std::string   eqSign;
 
    std::string   lastRead = "none";
    Real          epochVal = 0.0;
@@ -340,8 +339,6 @@ bool CCSDSOEMReader::ParseFile()
          {
             std::string errmsg = "Error reading ephemeris message file \"";
             errmsg += emFile + "\".  ";
-            //errmsg += "Header comment lines must appear directly after ";
-            //errmsg += "version number.\n";
             errmsg += "Comment lines must not appear within any block of ";
             errmsg += "ephemeris lines or covariance matrix lines.\n";
             throw UtilityException(errmsg);
@@ -481,7 +478,6 @@ bool CCSDSOEMReader::ParseFile()
             }
             
             // Create a new segment of the appropriate type
-            //currentSegment = CreateNewSegment(versionNumber, ++numSegments, dataType);
             currentSegment = CreateNewSegment(versionNumber, numSegments, dataType);
             ++numSegments;
 
@@ -881,34 +877,188 @@ bool CCSDSOEMReader::ParseFile()
          throw UtilityException(errmsg);
       }
    }
-   
-   //if (readingMeta)
-   //{
-   //   std::string errmsg = "Error reading ephemeris message file \"";
-   //   errmsg += emFile + "\".  META_STOP is missing ";
-   //   errmsg += "from the file.\n";
-   //   throw UtilityException(errmsg);
-   //}
-   //if ((readingData) && (!nonCommentFound))
-   //{
-   //   std::string errmsg = "Error reading ephemeris message file \"";
-   //   errmsg += emFile + "\".  No ephemeris data is in data block ";
-   //   errmsg += "from the file.\n";
-   //   throw UtilityException(errmsg);
-   //}
-   //if (lastRead != "data")
-   //{
-   //   std::string errmsg = "Error reading ephemeris message file \"";
-   //   errmsg += emFile + "\".  Meta data may have been read, ";
-   //   errmsg += "but file is missing corresponding data.\n";
-   //   throw UtilityException(errmsg);
-   //}
 
 #ifdef DEBUG_INIT_OEM_FILE
    MessageInterface::ShowMessage("In CCSDSOEMReader::ParseFile, closing the ephFile\n");
 #endif
-   if (ephFile.is_open())  ephFile.close();
 
    return true;
 }
 
+bool CCSDSOEMReader::ParseFile_v2()
+{
+   std::string line;
+   std::string keyWord, keyAllCaps, sVal;
+   std::string eqSign;
+   Real epochVal;
+
+   // Read header
+   while (true)
+   {
+      if (!ReadLine(line))
+      {
+         std::string errmsg = "Error reading ephemeris message file \"";
+         errmsg += emFile + "\". File terminates in header.\n";
+         throw UtilityException(errmsg);
+      }
+
+      std::istringstream lineStr(line);
+      lineStr >> keyWord;
+      keyAllCaps = GmatStringUtil::ToUpper(keyWord);
+
+      if (keyAllCaps == META_START)
+         break;
+
+      if (keyAllCaps == "COMMENT")
+      {
+         GmatFileUtil::GetLine(&lineStr, sVal);
+         comments.push_back(sVal);
+
+         continue;
+      }
+
+      lineStr >> eqSign;
+      if (eqSign != "=")
+      {
+         std::string errmsg = "Error reading ephemeris message file \"";
+         errmsg += emFile + "\".  ";
+         errmsg += "Equal sign missing or incorrect.\n";
+         throw UtilityException(errmsg);
+      }
+
+      if (keyAllCaps == "CLASSIFICATION")
+      {
+         // Not used
+      }
+      else if (keyAllCaps == "CREATION_DATE")
+      {
+         // get the rest of the line for the creationDate value
+         GmatFileUtil::GetLine(&lineStr, sVal);
+         std::string sValTrimmed = GmatStringUtil::Trim(sVal, GmatStringUtil::BOTH, true, true);
+         try
+         {
+            CCSDSEMSegment::ParseEpoch(sValTrimmed);
+         }
+         catch (UtilityException& ue)
+         {
+            std::string errmsg = "Error reading ephemeris message file \"";
+            errmsg += emFile + "\".  ";
+            errmsg += "CREATION_DATE is invalid.\n";
+            throw UtilityException(errmsg);
+         }
+         creationDate = sValTrimmed;
+      }
+      else if (keyAllCaps == "ORIGINATOR")
+      {
+         GmatFileUtil::GetLine(&lineStr, sVal);
+         std::string sValTrimmed = GmatStringUtil::Trim(sVal, GmatStringUtil::BOTH, true, true);
+         originator = sValTrimmed;
+      }
+      else if (keyAllCaps == "MESSAGE_ID")
+      {
+         // Not used
+      }
+      else
+      {
+         std::string errmsg = "Error reading ephemeris message file \"";
+         errmsg += emFile + "\".  ";
+         errmsg += "Field " + keyWord;
+         errmsg += " is not allowed in the header.\n";
+         throw UtilityException(errmsg);
+      }
+   }
+
+   // Read segments
+   while (true)
+   {
+      // Create a new segment of the appropriate type
+      currentSegment = CreateNewSegment(versionNumber, numSegments++, dataType);
+      segments.push_back(currentSegment);
+
+      // Read meta-data
+      while (true)
+      {
+         if (!ReadLine(line))
+         {
+            std::string errmsg = "Error reading ephemeris message file \"";
+            errmsg += emFile + "\". File terminates in meta-data.\n";
+            throw UtilityException(errmsg);
+         }
+
+         std::istringstream lineStr(line);
+         lineStr >> keyWord;
+         keyAllCaps = GmatStringUtil::ToUpper(keyWord);
+
+         if (keyAllCaps == META_STOP)
+            break;
+
+         if (keyAllCaps == "COMMENT")
+         {
+            GmatFileUtil::GetLine(&lineStr, sVal);
+            comments.push_back(sVal);
+            continue;
+         }
+
+         lineStr >> eqSign;
+         if (eqSign != "=")
+         {
+            std::string errmsg = "Error reading ephemeris message file \"";
+            errmsg += emFile + "\".  ";
+            errmsg += "Equal sign missing or incorrect.\n";
+            throw UtilityException(errmsg);
+         }
+
+         GmatFileUtil::GetLine(&lineStr, sVal);
+         std::string sValTrimmed = GmatStringUtil::Trim(sVal, GmatStringUtil::BOTH, true, true);
+         currentSegment->SetMetaData(keyAllCaps, sValTrimmed);
+      }
+
+      // Read data
+      while (true)
+      {
+         // Read position, velocity and maybe acceleration
+         if (!ReadLine(line))
+            return true; // EOF indicates the file is complete
+
+         std::istringstream lineStr(line);
+         lineStr >> keyWord;
+         keyAllCaps = GmatStringUtil::ToUpper(keyWord);
+
+         if (keyAllCaps == META_START)
+            break;
+
+         if (keyAllCaps == COVARIANCE_START)
+            while (true) // Read covariance
+            {
+               if (!ReadLine(line))
+               {
+                  std::string errmsg = "Error reading ephemeris message file \"";
+                  errmsg += emFile + "\". File terminates in covariance.\n";
+                  throw UtilityException(errmsg);
+               }
+
+               std::istringstream lineStr(line);
+               lineStr >> keyWord;
+               keyAllCaps = GmatStringUtil::ToUpper(keyWord);
+
+               if (keyAllCaps == COVARIANCE_STOP)
+                  break;
+
+               // Ignore covariance data (for now)
+            }
+         else // Process data
+         {
+            epochVal = CCSDSEMSegment::ParseEpoch(keyWord);
+
+            Rvector dataVec(6);
+            std::string strDataVal;
+
+            // ignore acceleration values
+            for (Integer i = 0; i < 6; i++)
+               lineStr >> dataVec[i];
+
+            currentSegment->AddData(epochVal, dataVec);
+         }
+      }
+   }
+}

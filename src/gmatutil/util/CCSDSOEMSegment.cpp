@@ -55,17 +55,13 @@
 //------------------------------------------------------------------------------
 // constructor (default)
 //------------------------------------------------------------------------------
-CCSDSOEMSegment::CCSDSOEMSegment(const std::string version, Integer segNum) : 
+CCSDSOEMSegment::CCSDSOEMSegment(const std::string version, Integer segNum) :
    CCSDSEMSegment(version, segNum)
 {
    if (formatVersion == "1.0")
       dataSize = 6;
    else if (formatVersion == "2.0")
-      dataSize = 9;
-   else
-      throw UtilityException("Error: CCSDS OEM version "
-         + version + 
-         " is not available in the current GMAT build.\n");
+      dataSize = 27;
 }
 
 //------------------------------------------------------------------------------
@@ -165,8 +161,18 @@ std::string CCSDSOEMSegment::GetMetaDataForWriting()
       ss << "COMMENT  " << metaComments[i] << std::endl;
    ss << "OBJECT_NAME          = " << objectName << std::endl;
    ss << "OBJECT_ID            = " << objectID << std::endl;
-   ss << "CENTER_NAME          = " << centerName << std::endl;
-   ss << "REF_FRAME            = " << refFrame << std::endl;
+
+   if (formatVersion == "2.0")
+   {
+      ss << "CENTER_NAME          = " << GmatStringUtil::ToUpper(centerName) << std::endl;
+      ss << "REF_FRAME            = " << GmatStringUtil::ToUpper(refFrame) << std::endl;
+   }
+   else
+   {
+      ss << "CENTER_NAME          = " << centerName << std::endl;
+      ss << "REF_FRAME            = " << refFrame << std::endl;
+   }
+
    ss << "TIME_SYSTEM          = " << timeSystem << std::endl;
    ss << "START_TIME           = " << startTimeStr << std::endl;
    ss << "USEABLE_START_TIME   = " << usableStartTimeStr << std::endl;
@@ -278,19 +284,15 @@ bool CCSDSOEMSegment::AddData(Real epoch, Rvector data, bool justCheckDataSize)
 
 
 //------------------------------------------------------------------------------
-// Adds an epoch/data pair to the dataStore for writing.
+// Adds an epoch/data/accel to the dataStore for writing.
 //------------------------------------------------------------------------------
 bool CCSDSOEMSegment::AddDataForWriting(Real epoch, Rvector &data)
 {
-   // Note that: useData may contain not only position and velocity but it may
-   // contains some other parameters else.
-   //Rvector useData(6, data[0], data[1], data[2], data[3], data[4], data[5]);
    EpochAndData *newData = new EpochAndData();
    newData->epoch = epoch;
-   //newData->data  = useData;
    newData->data = data;
    dataStore.push_back(newData);
-   
+
    #ifdef DEBUG_ADD_DATA_FOR_WRITING
    for (Integer i = 0; i < newData->data.GetSize(); ++i)
       MessageInterface::ShowMessage("data [%d] = %.15le\n", i, newData->data[i]);

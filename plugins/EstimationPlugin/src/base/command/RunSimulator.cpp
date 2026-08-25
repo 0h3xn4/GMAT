@@ -639,6 +639,8 @@ bool RunSimulator::Execute()
             MessageInterface::ShowMessage("RunSimulator::Execute(): FINSIHED state\n");
          #endif
          Finalize();
+         ReportStepStats();
+         step_sizes.clear();
          break;
 
       default:
@@ -1025,6 +1027,9 @@ void RunSimulator::Propagate()
    if (fabs(dt) > maxStep)
       dt = (dt > 0.0 ? maxStep : -maxStep);
 
+   if (fabs(dt) > 0)
+      step_sizes.push_back(fabs(dt));
+
    Step(dt);
    bufferFilled = false;
 
@@ -1329,6 +1334,64 @@ void RunSimulator::Simulate()
 
 }
 
+//------------------------------------------------------------------------------
+// void ReportStepStats()
+//------------------------------------------------------------------------------
+/**
+ * Produce statistics about step sizes
+ */
+//------------------------------------------------------------------------------
+void RunSimulator::ReportStepStats()
+{
+   MessageInterface::ShowMessage("Variable Step Integration Statistics (%s):\n", theSimulator->GetName().c_str());
+   if (step_sizes.size() == 0)
+   {
+      MessageInterface::ShowMessage("    0 steps taken\n");
+      return;
+   }
+
+   MessageInterface::ShowMessage("    %d steps taken\n", step_sizes.size());
+
+   Real total_steps = 0.0;
+   Real sum_of_sqrs = 0.0;
+   Real min_step_taken, max_step_taken;
+   min_step_taken = max_step_taken = step_sizes[0];
+
+   for (Real step_size : step_sizes)
+   {
+      total_steps += step_size;
+      sum_of_sqrs += step_size * step_size;
+
+      if (step_size < min_step_taken)
+         min_step_taken = step_size;
+
+      if (step_size > max_step_taken)
+         max_step_taken = step_size;
+   }
+
+   MessageInterface::ShowMessage("    Min step taken  : %f sec\n", min_step_taken);
+   MessageInterface::ShowMessage("    Max step taken  : %f sec\n", max_step_taken);
+
+   MessageInterface::ShowMessage("    Sum of steps    : %f sec\n", total_steps);
+   MessageInterface::ShowMessage("    Average step    : %f sec\n", total_steps / step_sizes.size());
+   Real std_dev = sqrt(sum_of_sqrs / step_sizes.size() - (total_steps / step_sizes.size()) * (total_steps / step_sizes.size()));
+   MessageInterface::ShowMessage("    Stddev of steps : %f sec\n", std_dev);
+
+   std::vector<Integer> histogram(10);
+   Real upper = (Integer)ceil(max_step_taken);
+
+   for (Real step_size : step_sizes)
+   {
+      if (step_size == max_step_taken)
+         ++histogram[9];
+      else
+         ++histogram[(Integer)floor(10 * step_size / max_step_taken)];
+   }
+
+   MessageInterface::ShowMessage("    Histogram:\n");
+   for(Integer i=0; i<10; i++)
+      MessageInterface::ShowMessage("        %6.1f - %6.1f sec : %6d\n", i * max_step_taken / 10, (i + 1) * max_step_taken / 10, histogram[i]);
+}
 
 //------------------------------------------------------------------------------
 // void Finalize()

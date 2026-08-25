@@ -412,22 +412,21 @@ bool CCSDSEphemerisFile::ReadDataRecords(int logOption)
       cb = "Luna";
    std::string coordinates = GetReferenceFrame();
    Integer runmode = GmatGlobal::Instance()->GetRunModeStartUp();
-   if (runmode != GmatGlobal::TESTING) {
-      bool validCoordinateSystem = false;
-      if(std::find(universallySupportedFrames.begin(), universallySupportedFrames.end(), coordinates) != universallySupportedFrames.end())
+
+   bool validCoordinateSystem = false;
+   if (std::find(universallySupportedFrames.begin(), universallySupportedFrames.end(), coordinates) != universallySupportedFrames.end())
+      validCoordinateSystem = true;
+   else if (testedCoordinateSystems.find(cb) != testedCoordinateSystems.end())
+      if ((std::count(testedCoordinateSystems[cb].begin(), testedCoordinateSystems[cb].end(), coordinates)))
          validCoordinateSystem = true;
-      else if (testedCoordinateSystems.find(cb) != testedCoordinateSystems.end())
-         if ((std::count(testedCoordinateSystems[cb].begin(), testedCoordinateSystems[cb].end(), coordinates)))
-            validCoordinateSystem = true;
-      
-      if (!validCoordinateSystem)
-      {
-         if (cb == "Luna")
-            cb = "Moon";
-         //did not find coordinates in central body list
-         std::string errmsg = "The coordinate system \"" + coordinates + "\" in use in ephemeris file \"" + ccsdsFileNameForRead + "\" is not supported for the central body \"" + cb + "\" for use by GMAT in a CCSDS-OEM ephemeris file.\n";
-         throw UtilityException(errmsg);
-      }
+
+   if (!validCoordinateSystem)
+   {
+      if (cb == "Luna")
+         cb = "Moon";
+      //did not find coordinates in central body list
+      std::string errmsg = "The coordinate system \"" + coordinates + "\" in use in ephemeris file \"" + ccsdsFileNameForRead + "\" is not supported for the central body \"" + cb + "\" for use by GMAT in a CCSDS-OEM ephemeris file.\n";
+      throw UtilityException(errmsg);
    }
 
    return retval;

@@ -10,7 +10,7 @@ pcre_version = '10.47'
 java_version = '11.0.5'
 java_update = '10'
 wx_build = True
-wx_version = '3.2.9'
+wx_version = '3.2.10'
 xerces_version = '3.2.2'
 osx_min_version = '14.5'
 

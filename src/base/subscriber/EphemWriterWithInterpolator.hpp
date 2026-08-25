@@ -35,7 +35,7 @@
 class GMAT_API EphemWriterWithInterpolator : public EphemerisWriter
 {
 public:
-   EphemWriterWithInterpolator(const std::string &name, const std::string &type);
+   EphemWriterWithInterpolator(const std::string& name, const std::string& type, const std::string& version = "");
    virtual ~EphemWriterWithInterpolator();
    EphemWriterWithInterpolator(const EphemWriterWithInterpolator &);
    EphemWriterWithInterpolator& operator=(const EphemWriterWithInterpolator&);
@@ -68,10 +68,8 @@ protected:
    void         CreateInterpolator();
    
    // General data handling
-   //virtual void FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs, 
-   //                                 Real stateToWrite[6]);
    virtual void FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs, 
-      Real stateToWrite[6], Real covToWrite[21], Real accelToWrite[3]);
+      Real stateToWrite[6], Real covToWrite[21]);
 
    
    // Interpolation
@@ -79,10 +77,8 @@ protected:
                                      bool saveEpochInfo,
                                      bool writeAfterData,
                                      bool ignoreBlankComments);
-   // bool         IsTimeToWrite(Real epochInSecs, const Real state[6], const Real cov[21]);
-   bool         IsTimeToWrite(Real epochInSecs, const Real state[6], const Real cov[21], const Real accel[3]);
-   // void         WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21]); 
-   virtual void WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4]);
+   bool         IsTimeToWrite(Real epochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3]);
+   virtual void WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3]);
    
    void         ProcessFinalDataOnWaiting(bool canFinish = true);
    void         ProcessEpochsOnWaiting(bool checkFinalEpoch,

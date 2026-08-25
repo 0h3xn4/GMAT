@@ -241,7 +241,7 @@ void AttitudeWriterCK::Copy(const EphemerisWriter* orig)
 //--------------------------------------
 
 //------------------------------------------------------------------------------
-// void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real accel[3])
+// void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3])
 //------------------------------------------------------------------------------
 /**
  * Buffer the orbit data to the kernel writer. For the CK file, we only care
@@ -250,13 +250,12 @@ void AttitudeWriterCK::Copy(const EphemerisWriter* orig)
  * @param epochInDays   The current epoch for the orbit data received
  * @param state         The state vector
  * @param cov           The covariance matrix
- * @param accel         The acceleration vector
  * @param quat          The quaternion vector
+ * @param accel         The acceleratio vector (not used)
  */
  //------------------------------------------------------------------------------
 void AttitudeWriterCK::BufferOrbitData(Real epochInDays, const Real state[6],
-                                       const Real cov[21], const Real accel[3],
-                                       const Real quat[4])
+                                       const Real cov[21], const Real quat[4], const Real accel[3])
 {
 #ifdef DEBUG_EPHEMFILE_BUFFER
    MessageInterface::ShowMessage
@@ -514,7 +513,7 @@ void AttitudeWriterCK::HandleWriteOrbit()
    ("AttitudeWriterCK::HandleWriteOrbit() entered\n");
 #endif
 
-   WriteOrbit(currEpochInSecs, currState, currCov, currAccel, currQuat);
+   WriteOrbit(currEpochInSecs, currState, currCov, currQuat, currAccel);
 
 #ifdef DEBUG_EPHEMFILE_WRITE
    MessageInterface::ShowMessage("AttitudeWriterCK::HandleWriteOrbit() leaving\n");
@@ -551,7 +550,7 @@ void AttitudeWriterCK::HandleCKOrbitData(bool writeData, bool timeToWrite)
 
       if (bufferData)
       {
-         Real outState[6], outCov[21], outAccel[3], outQuat[4];
+         Real outState[6], outCov[21], outQuat[4], outAccel[3];
          // Convert if necessary
          if (!writeDataInDataCS)
          {
@@ -565,13 +564,13 @@ void AttitudeWriterCK::HandleCKOrbitData(bool writeData, bool timeToWrite)
                outState[ii] = currState[ii];
             for (unsigned int ii = 0; ii < 21; ii++)
                outCov[ii] = currCov[ii];
-            for (unsigned int ii = 0; ii < 3; ii++)
-               outAccel[ii] = currAccel[ii];
             for (unsigned int ii = 0; ii < 4; ii++)
                outQuat[ii] = currQuat[ii];
+            for (unsigned int ii = 0; ii < 3; ii++)
+               outAccel[ii] = currAccel[ii];
          }
 
-         BufferOrbitData(currEpochInDays, outState, outCov, outAccel, outQuat);
+         BufferOrbitData(currEpochInDays, outState, outCov, outQuat, outAccel);
 
 #ifdef DEBUG_EPHEMFILE_SPICE
          DebugWriteOrbit("In HandleCKOrbitData:", currEpochInDays, currState, true, true);

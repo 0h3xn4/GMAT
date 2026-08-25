@@ -69,25 +69,22 @@
 
 
 //------------------------------------------------------------------------------
-// EphemerisWriter(const std::string &name, const std::string &type = "EphemerisWriter")
+// EphemerisWriter(const std::string &name, const std::string &type = "EphemerisWriter", const std::string& version="1.0")
 //------------------------------------------------------------------------------
 /**
  * Default constructor
  */
 //------------------------------------------------------------------------------
-EphemerisWriter::EphemerisWriter(const std::string &name, const std::string &type) :
+EphemerisWriter::EphemerisWriter(const std::string &name, const std::string& type, const std::string& version) :
    ephemName            (name),
    ephemType            (type),
-   
-   ephemVersion         (""),
-   writeAccelerationOption (false),
-   writeCovarianceOption   (false),
-
+   ephemVersion         (version),
    fileType             (UNKNOWN_FILE_TYPE),
    maxSegmentSize       (1000),
    spacecraft           (NULL),
    dataCoordSystem      (NULL),
    outCoordSystem       (NULL),
+   accelModel           (NULL),
    fullPathFileName     (""),
    spacecraftName       (""),
    spacecraftId         (""),
@@ -190,16 +187,12 @@ EphemerisWriter::~EphemerisWriter()
 EphemerisWriter::EphemerisWriter(const EphemerisWriter &ef) :
    ephemName            (ef.ephemName),
    ephemType            (ef.ephemType),
-
-   ephemVersion         (ef.ephemVersion),
-   writeAccelerationOption (ef.writeAccelerationOption),
-   writeCovarianceOption   (ef.writeCovarianceOption),
-
    fileType             (ef.fileType),
    maxSegmentSize       (ef.maxSegmentSize),
    spacecraft           (ef.spacecraft),
    outCoordSystem       (ef.outCoordSystem),
    dataCoordSystem      (ef.outCoordSystem),
+   accelModel           (ef.accelModel),
    fullPathFileName     (ef.fullPathFileName),
    spacecraftName       (ef.spacecraftName),
    spacecraftId         (ef.spacecraftId),
@@ -282,16 +275,12 @@ EphemerisWriter& EphemerisWriter::operator=(const EphemerisWriter& ef)
    
    ephemName            = ef.ephemName;
    ephemType            = ef.ephemType;
-   
-   ephemVersion         = ef.ephemVersion;
-   writeAccelerationOption = ef.writeAccelerationOption;
-   writeCovarianceOption   = ef.writeCovarianceOption;
-
    fileType             = ef.fileType;
    maxSegmentSize       = ef.maxSegmentSize;
    spacecraft           = ef.spacecraft;
    outCoordSystem       = ef.outCoordSystem;
    dataCoordSystem      = ef.dataCoordSystem;
+   accelModel           = ef.accelModel;
    fullPathFileName     = ef.fullPathFileName;
    spacecraftName       = ef.spacecraftName;
    spacecraftId         = ef.spacecraftId;
@@ -379,22 +368,6 @@ void EphemerisWriter::SetFileName(const std::string &currFileName,
    prevFileName = prevFullName;
 }
 
-
-
-//------------------------------------------------------------------------------
-// void SetEphemerisFormatVersion(const std::string &formatVersion)
-//------------------------------------------------------------------------------
-/**
-* This function is used to set ephemeris format (type) version
-* 
-* @param formatVersion      format version of the ephemeris file
-*/
-void EphemerisWriter::SetEphemerisFormatVersion(const std::string &formatVersion)
-{
-   ephemVersion = formatVersion;
-}
-
-
 //------------------------------------------------------------------------------
 // void SetSpacecraft(Spacecraft *sc)
 //------------------------------------------------------------------------------
@@ -419,6 +392,14 @@ void EphemerisWriter::SetDataCoordSystem(CoordinateSystem *dataCS)
 void EphemerisWriter::SetOutCoordSystem(CoordinateSystem *outCS)
 {
    outCoordSystem = outCS;
+}
+
+//------------------------------------------------------------------------------
+// void SetAccelModel(PhysicalModel* accelModel)
+//------------------------------------------------------------------------------
+void EphemerisWriter::SetAccelModel(ODEModel* am)
+{
+    accelModel = am;
 }
 
 //------------------------------------------------------------------------------
@@ -526,15 +507,14 @@ void EphemerisWriter::SetRunFlags(bool finalize, bool endOfRun, bool finalized)
 }
 
 //------------------------------------------------------------------------------
-// void SetOrbitData(Real epochInDays, Real state[6], Real cov[21], Real accel[3])
+// void EphemerisWriter::SetOrbitData(Real epochInDays, Real state[6], Real cov[21], Real quat[4])
 //------------------------------------------------------------------------------
-void EphemerisWriter::SetOrbitData(Real epochInDays, Real state[6], Real cov[21], Real accel[3], Real quat[4])
+void EphemerisWriter::SetOrbitData(Real epochInDays, Real state[6], Real cov[21], Real quat[4], Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_DATA
       MessageInterface::ShowMessage("epoch = %.12lf state = [%.15lf %.15lf %.15lf %.15lf %.15lf %.15lf]\n",
             epochInDays, state[0], state[1], state[2], state[3], state[4],
             state[5]);
-      MessageInterface::ShowMessage("accel = [%.15lf %.15lf %.15lf]\n", accel[0], accel[1], accel[3]);
    #endif
 
    currEpochInDays = epochInDays;
@@ -542,12 +522,10 @@ void EphemerisWriter::SetOrbitData(Real epochInDays, Real state[6], Real cov[21]
       currState[i] = state[i];
    for (int i = 0; i < 21; i++)
       currCov[i] = cov[i];
-
-   for (int i = 0; i < 3; i++)
-      currAccel[i] = accel[i];
    for (int i = 0; i < 4; i++)
       currQuat[i] = quat[i];
-
+   for (int i = 0; i < 3; i++)
+      currAccel[i] = accel[i];
 }
 
 
@@ -860,7 +838,6 @@ bool EphemerisWriter::OpenTextEphemerisFile(const std::string &fname)
    return retval;
 }
 
-
 //------------------------------------------------------------------------------
 // void CloseEphemerisFile(bool done = true, writeMetaData = true)
 //------------------------------------------------------------------------------
@@ -1012,7 +989,7 @@ void EphemerisWriter::HandleWriteOrbit()
       MessageInterface::ShowMessage
          ("===> Need to interpolateInitialState, so calling WriteOrbitAt()\n");
       #endif
-      WriteOrbitAt(nextReqEpochInSecs, currState, currCov, currAccel, currQuat);
+      WriteOrbitAt(nextReqEpochInSecs, currState, currCov, currQuat, currAccel);
       Real tdiff = nextReqEpochInSecs - (initialEpochA1Mjd * GmatTimeConstants::SECS_PER_DAY);
       if (GmatMathUtil::Abs(tdiff) <= 1.0-6)
       {
@@ -1030,18 +1007,18 @@ void EphemerisWriter::HandleWriteOrbit()
    
    if (useFixedStepSize)
    {
-      WriteOrbitAt(nextReqEpochInSecs, currState, currCov, currAccel, currQuat);
+      WriteOrbitAt(nextReqEpochInSecs, currState, currCov, currQuat, currAccel);
    }
    else if (interpolateFinalState)
    {
       if (currEpochInDays < finalEpochA1Mjd)
-         WriteOrbit(currEpochInSecs, currState, currCov, currAccel, currQuat);
+         WriteOrbit(currEpochInSecs, currState, currCov, currQuat, currAccel);
       else
-         WriteOrbitAt(nextReqEpochInSecs, currState, currCov, currAccel, currQuat);
+         WriteOrbitAt(nextReqEpochInSecs, currState, currCov, currQuat, currAccel);
    }
    else
    {
-      WriteOrbit(currEpochInSecs, currState, currCov, currAccel, currQuat);
+      WriteOrbit(currEpochInSecs, currState, currCov, currQuat, currAccel);
    }
    
    #ifdef DEBUG_EPHEMFILE_WRITE
@@ -1185,7 +1162,7 @@ bool EphemerisWriter::IsBackwardPropAllowed(Real propDirection)
 
 
 //------------------------------------------------------------------------------
-// void WriteOrbit(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3])
+// void WriteOrbit(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4])
 //------------------------------------------------------------------------------
 /**
  * Writes spacecraft orbit data to a ephemeris file.
@@ -1193,11 +1170,9 @@ bool EphemerisWriter::IsBackwardPropAllowed(Real propDirection)
  * @param reqEpochInSecs Requested epoch to write in seconds 
  * @param state State to write 
  * @param cov Covariance to write
- * @param accel  acceleartion to write
  */
 //------------------------------------------------------------------------------
-void EphemerisWriter::WriteOrbit(Real reqEpochInSecs, const Real state[6], 
-   const Real cov[21], const Real accel[3], const Real quat[4])
+void EphemerisWriter::WriteOrbit(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_WRITE
    MessageInterface::ShowMessage
@@ -1207,27 +1182,24 @@ void EphemerisWriter::WriteOrbit(Real reqEpochInSecs, const Real state[6],
    MessageInterface::ShowMessage
       ("   currState[0:2]=%.15f, %.15f, %.15f\n       state[0:2]=%.15f, %.15f, %.15f\n",
        currState[0], currState[1], currState[2], state[0], state[1], state[2]);
-   MessageInterface::ShowMessage
-      ("   currAccel[0:2]= [%.15f, %.15f, %.15f]\n       accel[0:2] = [%.15f, %.15f, %.15f]\n", 
-         currAccel[0], currAccel[1], currAccel[2], accel[0], accel[1], accel[2]);
    #endif
    
-   Real stateToWrite[6], covToWrite[21], accelToWrite[3], quatToWrite[4];
+   Real stateToWrite[6], covToWrite[21], quatToWrite[4], accelToWrite[3];
    for (int i=0; i<6; i++)
       stateToWrite[i] = state[i];
    for (int i = 0; i < 21; i++)
       covToWrite[i] = cov[i];
-   for (int i = 0; i < 3; i++)
-      accelToWrite[i] = accel[i];
    for (int i = 0; i < 4; i++)
       quatToWrite[i] = quat[i];
+   for (int i = 0; i < 3; i++)
+      accelToWrite[i] = accel[i];
 
    Real outEpochInSecs = reqEpochInSecs;
    
    if (useFixedStepSize)
       FindNextOutputEpoch(reqEpochInSecs, outEpochInSecs, stateToWrite, covToWrite, accelToWrite);
    
-   WriteOrbitData(outEpochInSecs, stateToWrite, covToWrite, accelToWrite, quatToWrite);
+   WriteOrbitData(outEpochInSecs, stateToWrite, covToWrite, quatToWrite, accelToWrite);
    
    #ifdef DEBUG_EPHEMFILE_WRITE
    DebugWriteTime("   Setting lastEpochWrote to outEpochInsecs ", outEpochInSecs);
@@ -1254,7 +1226,7 @@ void EphemerisWriter::WriteOrbit(Real reqEpochInSecs, const Real state[6],
 
 
 //------------------------------------------------------------------------------
-// void WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3])
+// WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4])
 //------------------------------------------------------------------------------
 /**
  * Writes spacecraft orbit data to a ephemeris file.
@@ -1262,10 +1234,9 @@ void EphemerisWriter::WriteOrbit(Real reqEpochInSecs, const Real state[6],
  * @param reqEpochInSecs Requested epoch to write in seconds 
  * @param state State to write 
  * @param cov Covariance to write
- * @param accel   Acceleration to write
  */
 //------------------------------------------------------------------------------
-void EphemerisWriter::WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4])
+void EphemerisWriter::WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3])
 {
 }
 
@@ -1463,13 +1434,9 @@ void EphemerisWriter::ClearOrbitData()
    for (ci = covArray.begin(); ci != covArray.end(); ++ci)
       delete (*ci);
    
-   std::vector<Rvector3*>::iterator ai;
-   for (ai = accelArray.begin(); ai != accelArray.end(); ++ai)
-      delete (*ai);
-
-   std::vector<Rvector*>::iterator rvacovi;
-   for (rvacovi = rvacovArray.begin(); rvacovi != rvacovArray.end(); ++rvacovi)
-      delete (*rvacovi);
+   std::vector<Rvector*>::iterator rvcovi;
+   for (rvcovi = rvcovArray.begin(); rvcovi != rvcovArray.end(); ++rvcovi)
+      delete (*rvcovi);
 
    std::vector<Rvector*>::iterator qi;
    for (qi = quatArray.begin(); qi != quatArray.end(); ++qi)
@@ -1478,29 +1445,26 @@ void EphemerisWriter::ClearOrbitData()
    a1MjdArray.clear();
    stateArray.clear();
    covArray.clear();
-   accelArray.clear();
-   rvacovArray.clear();
+   rvcovArray.clear();
    quatArray.clear();
 }
 
 
 //------------------------------------------------------------------------------
 // void FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs,
-//                          Real stateToWrite[6], Real covToWrite[21],
-//                          Real accelToWrite[3])
+//                          Real stateToWrite[6], Real covToWrite[21], Real accelToWrite[3])
 //------------------------------------------------------------------------------
 void EphemerisWriter::FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs,
-                                          Real stateToWrite[6], Real covToWrite[21], 
-                                          Real accelToWrite[3])
+                                          Real stateToWrite[6], Real covToWrite[21], Real accelToWrite[3])
 {
    // Do nothing here
 }
 
 
 //------------------------------------------------------------------------------
-// void WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3])
+// void WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], Real accel[3])
 //------------------------------------------------------------------------------
-void EphemerisWriter::WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4])
+void EphemerisWriter::WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_WRITE
    DebugWriteTime
@@ -1509,15 +1473,15 @@ void EphemerisWriter::WriteOrbitData(Real reqEpochInSecs, const Real state[6], c
       ("state[0:2]=%.15f, %.15f, %.15f\n", state[0], state[1], state[2]);
    #endif
    
-   Real outState[6], outCov[21], outAccel[3], outQuat[4];
+   Real outState[6], outCov[21], outQuat[4], outAccel[3];
    for (int i = 0; i < 6; i++)
       outState[i] = state[i];
    for (int i = 0; i < 21; i++)
       outCov[i] = cov[i];
    for (int i = 0; i < 3; i++)
-      outAccel[i] = accel[i];
-   for (int i = 0; i < 3; i++)
       outQuat[i] = quat[i];
+   for (int i = 0; i < 3; i++)
+      outAccel[i] = accel[i];
 
    #ifdef DEBUG_EPHEMFILE_WRITE
    MessageInterface::ShowMessage("EphemerisWriter::WriteOrbitData() Calling ConvertState()\n");
@@ -1531,8 +1495,7 @@ void EphemerisWriter::WriteOrbitData(Real reqEpochInSecs, const Real state[6], c
    #ifdef DEBUG_EPHEMFILE_WRITE
    MessageInterface::ShowMessage("EphemerisWriter::WriteOrbitData() Calling BufferOrbitData()\n");
    #endif
-   // BufferOrbitData(reqEpochInSecs / GmatTimeConstants::SECS_PER_DAY, outState, outCov);
-   BufferOrbitData(reqEpochInSecs / GmatTimeConstants::SECS_PER_DAY, outState, outCov, outAccel, outQuat);
+   BufferOrbitData(reqEpochInSecs / GmatTimeConstants::SECS_PER_DAY, outState, outCov, outQuat, outAccel);
 
    #ifdef DEBUG_EPHEMFILE_WRITE
    MessageInterface::ShowMessage("EphemerisWriter::WriteOrbitData() leaving\n");
@@ -1542,13 +1505,11 @@ void EphemerisWriter::WriteOrbitData(Real reqEpochInSecs, const Real state[6], c
 
 //------------------------------------------------------------------------------
 // void ConvertState(Real epochInDays, const Real inState[6], Real outState[6],
-//                   const Real inCov[21], Real outCov[21], const Real inAccel[3], 
-//                   Real outAccel[3])
+//                   const Real inCov[21], Real outCov[21])
 //------------------------------------------------------------------------------
 void EphemerisWriter::ConvertState(Real epochInDays, const Real inState[6],
                                  Real outState[6], const Real inCov[21],
-                                 Real outCov[21], const Real inAccel[3], 
-                                 Real outAccel[3])
+                                 Real outCov[21], const Real inAccel[3], Real outAccel[3])
 {
    #ifdef DEBUG_EPHEMFILE_CONVERT_STATE   
    DebugWriteOrbit("In ConvertState(in):", epochInDays, inState, true, true);
@@ -1561,12 +1522,13 @@ void EphemerisWriter::ConvertState(Real epochInDays, const Real inState[6],
    Rmatrix33 rdot = coordConverter.GetLastRotationDotMatrix();
 
    Rmatrix cov(6,6);
-   for (UnsignedInt ii = 0U; ii < 6; ii++)
+   UnsignedInt idx = 0U;
+   for (UnsignedInt ii = 0; ii < 6; ii++)
    {
-      for (UnsignedInt jj = 0U; jj < 6; jj++)
+      for (UnsignedInt jj = 0; jj <= ii; jj++)
       {
-         UnsignedInt idx = (ii)*(ii + 1) / 2 + jj;
-         cov(ii, jj) = inCov[idx];
+         cov(ii, jj) = cov(jj, ii) = inCov[idx];
+         idx++;
       }
    }
 
@@ -1585,7 +1547,7 @@ void EphemerisWriter::ConvertState(Real epochInDays, const Real inState[6],
    Rmatrix outCovMatrix(6, 6);
    outCovMatrix = covRot * cov * covRot.Transpose();
 
-   UnsignedInt idx = 0U;
+   idx = 0U;
    for (UnsignedInt ii = 0; ii < 6; ii++)
    {
       for (UnsignedInt jj = 0; jj <= ii; jj++)
@@ -1594,7 +1556,7 @@ void EphemerisWriter::ConvertState(Real epochInDays, const Real inState[6],
          idx++;
       }
    }
-   
+
    Rvector3 pos, vel, accel, outAcceleration;
    for (Integer i = 0; i < 3; ++i)
    {
@@ -1610,7 +1572,7 @@ void EphemerisWriter::ConvertState(Real epochInDays, const Real inState[6],
    //        [Rot] is rotaion matrix from Frame1 to Frame2
    //        newPos and pos are position of spacecarft represents in Frame2 and Frame1 respectively 
    // Take both size of equation w.r.t. time tiwce. We obatins
-   //        newAcceleration = accelO2 - accelO1 + accel + 2*[(d/dt)[Rot]]*vel + [(dd/dtdt)[Rot]]*pos 
+   //        newAcceleration = accelO2 - accelO1 + [Rot] * accel + 2*[(d/dt)[Rot]]*vel + [(dd/dtdt)[Rot]]*pos 
    // Where: pos, vel, and accel are position, velocity, and acceleration in Frame1
    //        [(d/dt)[Rot]] and [(dd/dtdt)[Rot]] are first and second derivative of [Rot] matrix w.r.t. time 
    //        accelO1 and accelO2 are accelration of origins of Frame1 and Frame2 respectively.
@@ -1624,10 +1586,10 @@ void EphemerisWriter::ConvertState(Real epochInDays, const Real inState[6],
    Rmatrix33 r2dot;
    r2dot.Set(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
 
-   outAcceleration = accelO2 - accelO1 + accel + 2 * (rdot*vel) + r2dot * pos;
+   outAcceleration = accelO2 - accelO1 + r * accel + 2 * (rdot * vel) + r2dot * pos;
    for (Integer i = 0; i < 3; ++i)
       outAccel[i] = outAcceleration[i];
-
+   
    #ifdef DEBUG_EPHEMFILE_CONVERT_STATE   
    DebugWriteOrbit("In ConvertState(out):", epochInDays, outState, true, true);
    #endif

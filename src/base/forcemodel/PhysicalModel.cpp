@@ -173,16 +173,13 @@ PhysicalModel::PhysicalModel(UnsignedInt id, const std::string &typeStr,
    psm                         (NULL),
    theState                    (NULL),
    modelState                  (NULL),
-   modelStateDot               (NULL),
    rawState                    (NULL),
-   rawStateDot                 (NULL),
    epoch                       (21545.0),
    epochGT                     (21545.0),
    elapsedTime                 (0.0),
    prevElapsedTime             (0.0),
    direction                   (1.0),
    deriv                       (NULL),
-   rawDeriv                    (NULL),
    massJacobian                (NULL),
    timeJacobian                (NULL),
    relativeErrorThreshold      (0.10),
@@ -244,23 +241,6 @@ PhysicalModel::~PhysicalModel()
       }
    }
 
-   if (rawStateDot != modelStateDot)
-   {
-      if (rawStateDot)
-      {
-         #ifdef DEBUG_MEMORY
-         MemoryTracker::Instance()->Remove
-         (rawStateDot, "rawStateDot", "PhysicalModel::~PhysicalModel()", 
-            "deleting rawStateDot", this);
-         #endif
-         #ifdef DEBUG_STATE_ALLOCATION
-         MessageInterface::ShowMessage("Deleting rawStateDot at %p\n", 
-            rawStateDot);
-         #endif
-         delete[] rawStateDot;
-      }
-   }
-
    if (modelState)
    {
       #ifdef DEBUG_MEMORY
@@ -275,21 +255,6 @@ PhysicalModel::~PhysicalModel()
       #endif
       delete [] modelState;
    }
-   
-   if (modelStateDot)
-   {
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Remove
-      (modelStateDot, "modelStateDot", "PhysicalModel::~PhysicalModel()", 
-         "deleting modelStateDot", this);
-      #endif
-
-      #ifdef DEBUG_STATE_ALLOCATION
-      MessageInterface::ShowMessage("Deleting modelStateDot at %p\n", 
-         modelStateDot);
-      #endif
-      delete[] modelStateDot;
-   }
 
    if (deriv)
    {
@@ -299,16 +264,6 @@ PhysicalModel::~PhysicalModel()
           "deleting deriv", this);
       #endif
       delete [] deriv;
-   }
-
-   if (rawDeriv)
-   {
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Remove
-      (rawDeriv, "rawDeriv", "PhysicalModel::~PhysicalModel()", 
-         "deleting rawDeriv", this);
-      #endif
-      delete[] rawDeriv;
    }
 }
 
@@ -333,16 +288,13 @@ PhysicalModel::PhysicalModel(const PhysicalModel& pm) :
    psm                         (NULL),
    theState                    (NULL),
    modelState                  (NULL),
-   modelStateDot               (NULL),
    rawState                    (NULL),
-   rawStateDot                 (NULL),
    epoch                       (pm.epoch),
    epochGT                     (pm.epochGT),
    elapsedTime                 (pm.elapsedTime),
    prevElapsedTime             (pm.prevElapsedTime),
    direction                   (pm.direction),
    deriv                       (NULL),
-   rawDeriv                    (NULL),
    massJacobian                (NULL),
    timeJacobian                (NULL),
    derivativeIds               (pm.derivativeIds),
@@ -391,22 +343,6 @@ PhysicalModel::PhysicalModel(const PhysicalModel& pm) :
    }
    rawState = modelState;
 
-   if (pm.modelStateDot != NULL)
-   {
-      modelStateDot = new Real[dimension];
-
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Add
-      (modelStateDot, "modelStateDot", "PhysicalModel::PhysicalModel(copy)", 
-         "modelStateDot = new Real[dimension]", this);
-      #endif
-      if (modelStateDot != NULL)
-         memcpy(modelStateDot, pm.modelStateDot, dimension * sizeof(Real));
-      else
-         isInitialized = false;
-   }
-   rawStateDot = modelStateDot;
-
    if (pm.deriv != NULL) 
    {
       deriv = new Real[dimension];
@@ -417,20 +353,6 @@ PhysicalModel::PhysicalModel(const PhysicalModel& pm) :
       #endif
       if (deriv != NULL) 
          memcpy(deriv, pm.deriv, dimension * sizeof(Real));
-      else
-         isInitialized = false;
-   }
-
-   if (pm.rawDeriv != NULL)
-   {
-      rawDeriv = new Real[dimension];
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Add
-      (rawDeriv, "rawDeriv", "PhysicalModel::PhysicalModel(copy)", 
-         "rawDeriv = new Real[dimension]", this);
-      #endif
-      if (rawDeriv != NULL)
-         memcpy(rawDeriv, pm.rawDeriv, dimension * sizeof(Real));
       else
          isInitialized = false;
    }
@@ -559,64 +481,6 @@ PhysicalModel& PhysicalModel::operator=(const PhysicalModel& pm)
       rawState = NULL;
    }
    rawState = modelState;
-   
-   if (pm.modelStateDot)
-   {
-      if (modelStateDot)
-      {
-         #ifdef DEBUG_MEMORY
-         MemoryTracker::Instance()->Remove
-         (modelStateDot, "modelStateDot", "PhysicalModel::operator=()", 
-            "deleting modelStateDot", this);
-         #endif
-
-         #ifdef DEBUG_STATE_ALLOCATION
-         MessageInterface::ShowMessage("Deleting modelStateDot at %p\n", 
-            modelStateDot);
-         #endif
-         if (modelStateDot != rawStateDot)
-         {
-            delete[] modelStateDot;
-            modelStateDot = NULL;
-         }
-      }
-
-      modelStateDot = new Real[dimension];
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Add
-      (modelStateDot, "modelStateDot", "ODEModel::operator=()", 
-         "modelStateDot = new Real[dimension]", this);
-      #endif
-
-      if (modelStateDot != NULL)
-         memcpy(modelStateDot, pm.modelStateDot, dimension * sizeof(Real));
-      else
-         isInitialized = false;
-
-      stateChanged = pm.stateChanged;
-   }
-   else
-   {
-      if (modelStateDot != NULL)
-      {
-         #ifdef DEBUG_STATE_ALLOCATION
-         MessageInterface::ShowMessage("Deleting modelStateDot at %p\n", 
-            modelStateDot);
-         #endif
-         if (modelStateDot != rawStateDot)
-         {
-            delete[] modelStateDot;
-            modelStateDot = NULL;
-         }
-      }
-   }
-
-   if (rawStateDot != NULL)
-   {
-      delete[] rawStateDot;
-      rawStateDot = NULL;
-   }
-   rawStateDot = modelStateDot;
 
    if (pm.deriv)
    {
@@ -649,40 +513,6 @@ PhysicalModel& PhysicalModel::operator=(const PhysicalModel& pm)
       {
          delete [] deriv;
          deriv = NULL;
-      }
-   }
-   
-   if (pm.rawDeriv)
-   {
-      if (rawDeriv)
-      {
-         #ifdef DEBUG_MEMORY
-         MemoryTracker::Instance()->Remove
-         (rawDeriv, "rawDeriv", "PhysicalModel::operator=()", 
-            "deleting rawDeriv", this);
-         #endif
-         delete[] rawDeriv;
-         rawDeriv = NULL;
-      }
-
-      rawDeriv = new Real[dimension];
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Add
-      (rawDeriv, "rawDeriv", "ODEModel::operator=()", 
-         "rawDeriv = new Real[dimension]", this);
-      #endif
-
-      if (rawDeriv != NULL)
-         memcpy(rawDeriv, pm.rawDeriv, dimension * sizeof(Real));
-      else
-         isInitialized = false;
-   }
-   else
-   {
-      if (rawDeriv)
-      {
-         delete[] rawDeriv;
-         rawDeriv = NULL;
       }
    }
 
@@ -857,21 +687,6 @@ bool PhysicalModel::Initialize()
       delete [] rawState;
       rawState = NULL;
    }
-   
-   if ((rawStateDot != NULL) && (rawStateDot != modelStateDot))
-   {
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Remove
-      (rawStateDot, "rawStateDot", "PhysicalModel::Initialize()", 
-         "deleting rawStateDot", this);
-      #endif
-
-      #ifdef DEBUG_STATE_ALLOCATION
-      MessageInterface::ShowMessage("Deleting rawStateDot at %p\n", rawStateDot);
-      #endif
-      delete[] rawStateDot;
-      rawStateDot = NULL;
-   }
 
    if (modelState)
    {
@@ -891,25 +706,6 @@ bool PhysicalModel::Initialize()
       
       isInitialized = false;
    }
-   
-   if (modelStateDot)
-   {
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Remove
-      (modelStateDot, "modelStateDot", "PhysicalModel::Initialize()", 
-         "deleting modelStateDot", this);
-      #endif
-
-      #ifdef DEBUG_STATE_ALLOCATION
-      MessageInterface::ShowMessage("Deleting modelStateDot (for %s) at %p\n", 
-         typeName.c_str(), modelStateDot);
-      #endif
-      delete[] modelStateDot;
-      modelStateDot = NULL;
-      rawStateDot = NULL;
-      
-      isInitialized = false;
-   }
 
    if (deriv)
    {
@@ -920,17 +716,6 @@ bool PhysicalModel::Initialize()
       #endif
       delete [] deriv;
       deriv = NULL;
-   }
-
-   if (rawDeriv)
-   {
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Remove
-      (rawDeriv, "rawDeriv", "PhysicalModel::Initialize()", 
-         "deleting rawDeriv", this);
-      #endif
-      delete[] rawDeriv;
-      rawDeriv = NULL;
    }
 
    if (massJacobian)
@@ -964,9 +749,6 @@ bool PhysicalModel::Initialize()
    modelState = new Real[dimension];
    for (Integer i = 0; i < dimension; ++i)
       modelState[i] = 0.0;
-   modelStateDot = new Real[dimension];
-   for (Integer i = 0; i < dimension; ++i)
-      modelStateDot[i] = 0.0;
 
    #ifdef DEBUG_STATE_ALLOCATION
       MessageInterface::ShowMessage("%p\n", modelState);
@@ -996,22 +778,6 @@ bool PhysicalModel::Initialize()
       else
          isInitialized = false;
 
-      
-      rawDeriv = new Real[dimension];
-      #ifdef DEBUG_MEMORY
-      MemoryTracker::Instance()->Add
-      (rawDeriv, "rawDeriv", "PhysicalModel::Initialize()", 
-         "rawDeriv = new Real[dimension]", this);
-      #endif
-      if (rawDeriv)
-      {
-         for (Integer i = 0; i < dimension; ++i)
-            rawDeriv[i] = 0.0;
-         isInitialized = true;
-      }
-      else
-         isInitialized = false;
-
       if (fillMassJacobian && hasMassJacobian)
       {
          #ifdef DEBUG_MASS_JACOBIAN
@@ -1034,7 +800,6 @@ bool PhysicalModel::Initialize()
       isInitialized = false;
 
    rawState = modelState;
-   rawStateDot = modelStateDot;
 
    #ifdef DEBUG_MASS_JACOBIAN
       MessageInterface::ShowMessage("Mass Jacobian: %p\n", massJacobian);
@@ -1156,11 +921,6 @@ Real * PhysicalModel::GetState()
 //   return rawState;
 }
 
-Real * PhysicalModel::GetStateDot()
-{
-   return modelStateDot;
-}
-
 //------------------------------------------------------------------------------
 // Real * PhysicalModel::GetJ2KState()
 //------------------------------------------------------------------------------
@@ -1202,22 +962,6 @@ void PhysicalModel::SetState(const Real * st)
 }
 
 
-void PhysicalModel::SetStateDot(const Real * stDot)
-{
-#ifdef PHYSICAL_MODEL_DEBUG_INIT
-   MessageInterface::ShowMessage(
-      "PhysicalModel::SetStateDot(const Real * stDot) called for %s<%s>\n",
-      typeName.c_str(), instanceName.c_str());
-#endif
-   if (modelStateDot != NULL)
-   {
-      for (Integer i = 0; i < dimension; i++)
-         modelStateDot[i] = stDot[i];
-      stateChanged = true;
-   }
-}
-
-
 void PhysicalModel::SetState(GmatState * st)
 {
    #ifdef PHYSICAL_MODEL_DEBUG_INIT
@@ -1237,9 +981,6 @@ void PhysicalModel::SetState(GmatState * st)
    {
       // Set state value
       SetState(st->GetState());
-
-      // Set state dot value
-      SetStateDot(st->GetStateDot());
    }
 }
 
@@ -1258,21 +999,6 @@ const Real* PhysicalModel::GetDerivativeArray()
    return deriv;
 }
 
-
-
-//------------------------------------------------------------------------------
-// const Real* PhysicalModel::GetJ2KDerivativeArray(void)
-//------------------------------------------------------------------------------
-/**
- * Accessor for the derivative array presented in j2k body MJ2000 coordinate system
- * This method returns a pointer to the derivative array.  The Predictor-
- * Correctors need this access in order to extrapolate the next state.
- */
- //------------------------------------------------------------------------------
-const Real* PhysicalModel::GetJ2KDerivativeArray()
-{
-   return rawDeriv;
-}
 
 //------------------------------------------------------------------------------
 // void PhysicalModel::IncrementTime(Real dt)

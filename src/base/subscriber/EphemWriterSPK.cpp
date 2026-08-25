@@ -231,10 +231,10 @@ void EphemWriterSPK::Copy(const EphemerisWriter* orig)
 //--------------------------------------
 
 //------------------------------------------------------------------------------
-// void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real accel[3])
+// void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3])
 //------------------------------------------------------------------------------
 void EphemWriterSPK::BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21],
-                                     const Real accel[3], const Real quat[4])
+                                     const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_BUFFER
    MessageInterface::ShowMessage
@@ -473,7 +473,7 @@ void EphemWriterSPK::HandleWriteOrbit()
       ("EphemWriterSPK::HandleWriteOrbit() entered\n");
    #endif
    
-   WriteOrbit(currEpochInSecs, currState, currCov, currAccel, currQuat);
+   WriteOrbit(currEpochInSecs, currState, currCov, currQuat, currAccel);
    
    #ifdef DEBUG_EPHEMFILE_WRITE
    MessageInterface::ShowMessage("EphemWriterSPK::HandleWriteOrbit() leaving\n");
@@ -503,7 +503,7 @@ void EphemWriterSPK::HandleSpkOrbitData(bool writeData, bool timeToWrite)
       
       if (bufferData)
       {
-         Real outState[6], outCov[21], outAccel[3], outQuat[4];
+         Real outState[6], outCov[21], outQuat[4], outAccel[3];
          // Convert if necessary
          if (!writeDataInDataCS)
          {
@@ -515,13 +515,13 @@ void EphemWriterSPK::HandleSpkOrbitData(bool writeData, bool timeToWrite)
               outState[ii] = currState[ii];
             for (unsigned int ii = 0; ii < 21; ii++)
               outCov[ii] = currCov[ii];
-            for (unsigned int ii = 0; ii < 3; ii++)
-               outAccel[ii] = currAccel[ii];
             for (unsigned int ii = 0; ii < 4; ii++)
                outQuat[ii] = currQuat[ii];
+            for (unsigned int ii = 0; ii < 3; ii++)
+               outAccel[ii] = currAccel[ii];
          }
          
-         BufferOrbitData(currEpochInDays, outState, outCov, outAccel, outQuat);
+         BufferOrbitData(currEpochInDays, outState, outCov, outQuat, outAccel);
          
          #ifdef DEBUG_EPHEMFILE_SPICE
          DebugWriteOrbit("In HandleSpkOrbitData:", currEpochInDays, currState, true, true);

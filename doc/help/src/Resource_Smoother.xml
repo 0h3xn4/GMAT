@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry version="5.0" xml:id="Smoother"
-          xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude"
-          xmlns:svg="http://www.w3.org/2000/svg"
-          xmlns:m="http://www.w3.org/1998/Math/MathML"
-          xmlns:html="http://www.w3.org/1999/xhtml"
-          xmlns:db="http://docbook.org/ns/docbook">
+          xmlns="http://docbook.org/ns/docbook">
   <indexterm>
     <primary>Smoother</primary>
   </indexterm>
@@ -627,31 +621,6 @@
       <guilabel>Verbose</guilabel> (requires setting RUN_MODE = TESTING in
       gmat_startup_file.txt) to produce a report of the backward filter run to
       assist troubleshooting.</para>
-    </refsection>
-
-    <refsection>
-      <title>Navigation Requires Use of Fixed Step Numerical
-      Integration</title>
-
-      <para>GMAT navigation requires use of fixed stepped propagation. The
-      <guilabel>ExtendedKalmanFilter</guilabel> resource has a
-      <guilabel>Propagator</guilabel> field containing the name of the
-      <guilabel>Propagator</guilabel> resource that will be used during the
-      estimation process. As shown in the <guilabel>Note</guilabel> below,
-      there are some hard restrictions on the choice of error control
-      specified for the <guilabel>ForceModel</guilabel> resource associated
-      with your propagator.</para>
-
-      <note>
-        <para>The <guilabel>ErrorControl</guilabel> parameter specified for
-        the <guilabel>ForceModel</guilabel> resource associated with the
-        <guilabel>ExtendedKalmanFilter</guilabel>
-        <guilabel>Propagator</guilabel> must be set to '<code>None</code>.' Of
-        course, when using fixed step control, the user must choose a step
-        size, as given by the <guilabel>Propagator</guilabel>
-        <guilabel>InitialStepSize</guilabel> field, for the chosen orbit
-        regime and force profile, that yields the desired accuracy.</para>
-      </note>
     </refsection>
 
     <refsection>

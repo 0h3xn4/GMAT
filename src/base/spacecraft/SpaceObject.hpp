@@ -49,8 +49,6 @@ public:
    
    virtual Rvector6     GetLastState();
    virtual GmatState&   GetState();
-   virtual Rvector3     GetAcceleration() { return acceleration; };
-   virtual void         SetAcceleration(Rvector3 accel) { acceleration = accel; };
 
    virtual Real         GetEpoch();
    virtual GmatTime     GetEpochGT();
@@ -101,17 +99,14 @@ public:
    virtual const Rvector6 GetMJ2000State(const A1Mjd &atTime);
    virtual const Rvector3 GetMJ2000Position(const A1Mjd &atTime);
    virtual const Rvector3 GetMJ2000Velocity(const A1Mjd &atTime);
-   virtual const Rvector3 GetMJ2000Acceleration(const A1Mjd &atTime);
 
    virtual const Rvector6 GetMJ2000State(const Real atTime) { return GetMJ2000State(A1Mjd(atTime)); };
    virtual const Rvector3 GetMJ2000Position(const Real atTime) { return GetMJ2000Position(A1Mjd(atTime)); };
    virtual const Rvector3 GetMJ2000Velocity(const Real atTime) { return GetMJ2000Velocity(A1Mjd(atTime)); };
-   virtual const Rvector3 GetMJ2000Acceleration(const Real atTime) { return GetMJ2000Acceleration(A1Mjd(atTime)); };
 
    virtual const Rvector6 GetMJ2000State(const GmatTime &atTime);
    virtual const Rvector3 GetMJ2000Position(const GmatTime &atTime);
    virtual const Rvector3 GetMJ2000Velocity(const GmatTime &atTime);
-   virtual const Rvector3 GetMJ2000Acceleration(const GmatTime &atTime);
 
    //   virtual std::string GetParameterText(const Integer id) const;
 //   virtual Gmat::ParameterType
@@ -142,8 +137,6 @@ public:
 protected:
    /// The spacecraft state
    GmatState         state;
-   /// The space object's acceleration
-   Rvector3          acceleration;
 
    /// true when a finite burn needs to be applied to this SpaceObject
    bool              isManeuvering;

@@ -31,13 +31,14 @@
 #include "Spacecraft.hpp"
 #include "CoordinateSystem.hpp"
 #include "CoordinateConverter.hpp"
+#include "ODEModel.hpp"
 #include <iostream>
 #include <fstream>
 
 class GMAT_API EphemerisWriter
 {
 public:
-   EphemerisWriter(const std::string &name, const std::string &type = "EphemerisWriter");
+   EphemerisWriter(const std::string &name, const std::string &type = "EphemerisWriter", const std::string &version = "");
    virtual ~EphemerisWriter();
    EphemerisWriter(const EphemerisWriter &);
    EphemerisWriter& operator=(const EphemerisWriter&);
@@ -47,17 +48,10 @@ public:
                      const std::string &currFullName,
                      const std::string &prevFullName);
 
-   void  SetEphemerisFormatVersion(const std::string &formatVersion);
-   bool  SetAddingAccelerationOption(bool addingOption)
-           { writeAccelerationOption = addingOption;
-             return writeAccelerationOption; };
-   bool  SetAddingCovarianceOption(bool addingOption) 
-           { writeCovarianceOption = addingOption;
-             return writeCovarianceOption; };
-
    void  SetSpacecraft(Spacecraft *sc);
    void  SetDataCoordSystem(CoordinateSystem *dataCS);
    void  SetOutCoordSystem(CoordinateSystem *outCS);
+   void  SetAccelModel(ODEModel* am);
    void  SetInitialData(const std::string &iniEpoch, const std::string &finEpoch,
                         const std::string &stpSize, Real stepInSecs,
                         bool useFixedStep, const std::string &interpName,
@@ -68,8 +62,7 @@ public:
    void  SetBackgroundGeneration(bool inBackground);
    void  SetRunFlags(bool finalize, bool endOfRun, bool isFinalized);
 
-   // void  SetOrbitData(Real epochInDays, Real state[6], Real cov[21]);
-   void  SetOrbitData(Real epochInDays, Real state[6], Real cov[21], Real accel[3], Real quat[4]);
+   void  SetOrbitData(Real epochInDays, Real state[6], Real cov[21], Real quat[4], Real accel[3]);
    
    void  SetEpochAndDirection(Real prvEpochInSecs, Real curEpochInSecs,
                               Real prvPropDir, Real curPropDir);
@@ -126,6 +119,7 @@ public:
     */
    virtual void  FinishUpWriting() = 0;
 
+   // Rvector3 GetAcceleration(GmatTime ep, Rvector data);
    
    // Need to be able to close background SPKs and leave ready for appending
    // Finalization
@@ -137,7 +131,7 @@ public:
    
    virtual EphemerisWriter* Clone(void) const = 0;
    virtual void  Copy(const EphemerisWriter* orig);
-   
+
 protected:
 
    //@note Should match FileType in EphemerisFile.hpp for now
@@ -149,12 +143,7 @@ protected:
    
    std::string ephemName;
    std::string ephemType;
-
-   // Ephemeris file format (type) version 
    std::string ephemVersion;
-   bool        writeAccelerationOption;
-   bool        writeCovarianceOption;
-
    
    FileType    fileType;
 
@@ -164,13 +153,13 @@ protected:
    Spacecraft       *spacecraft;
    CoordinateSystem *dataCoordSystem;
    CoordinateSystem *outCoordSystem;
+   ODEModel         *accelModel;
    
    // for buffering ephemeris data
    EpochArray  a1MjdArray;
    StateArray  stateArray;
    std::vector<Rvector*>  covArray;
-   std::vector<Rvector3*> accelArray;
-   std::vector<Rvector*>  rvacovArray;
+   std::vector<Rvector*>  rvcovArray;
    std::vector<Rvector*>  quatArray;
 
    std::string spacecraftName;
@@ -212,10 +201,8 @@ protected:
    Real        eventEpochInSecs;
    Real        currState[6];
    Real        currCov[21];
-   
-   Real        currAccel[3];
-
    Real        currQuat[4];
+   Real        currAccel[3];
 
    bool        canFinalize;
    bool        isEndOfRun;
@@ -256,8 +243,7 @@ protected:
    //------------------------------------------------------------------------------
    /** Handles buffering orbit data.
     */
-   //virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21]) = 0; 
-   virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4]) = 0;
+   virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3]) = 0;
    
    // Initialization
    bool         OpenTextEphemerisFile(const std::string &fn);
@@ -266,10 +252,8 @@ protected:
    bool         CheckInitialAndFinalEpoch();
    
    virtual void HandleWriteOrbit();
-   //virtual void WriteOrbit(Real reqEpochInSecs, const Real state[6], const Real cov[21]); 
-   virtual void WriteOrbit(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4]);
-   //virtual void WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21]); 
-   virtual void WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4]);
+   virtual void WriteOrbit(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3]);
+   virtual void WriteOrbitAt(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3]);
 
    virtual void HandleWriteAttitude();
    virtual void GetAttitude();
@@ -287,18 +271,14 @@ protected:
    
    // General data handling
    void         ClearOrbitData();
-   //virtual void FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs, 
-   //                                 Real stateToWrite[6], Real covToWrite[21]);
    virtual void FindNextOutputEpoch(Real reqEpochInSecs, Real &outEpochInSecs, 
                                     Real stateToWrite[6], Real covToWrite[21], Real accelToWrite[3]);
-   //void         WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21]);
-   void         WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real accel[3], const Real quat[4]);
+   void         WriteOrbitData(Real reqEpochInSecs, const Real state[6], const Real cov[21], const Real quat[4], const Real accel[3]);
 
    // CoordinateSystem conversion
    void         ConvertState(Real epochInDays, const Real inState[6],
                              Real outState[6], const Real inCov[21],
-                             Real outCov[21], const Real inAccel[3], 
-                             Real outAccel[3]);
+                             Real outCov[21], const Real inAccel[3], Real outAccel[3]);
    
    // Time formatting
    std::string  ToUtcGregorian(Real epoch, bool inDays = false, Integer format = 2);

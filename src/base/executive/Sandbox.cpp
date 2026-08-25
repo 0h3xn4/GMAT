@@ -45,6 +45,7 @@
 #include "SubscriberException.hpp"
 #include "CommandUtil.hpp"         // for GetCommandSeqString()
 #include "MessageInterface.hpp"
+#include "EphemerisFile.hpp"
 
 #include <algorithm>       // for find
 
@@ -608,6 +609,9 @@ bool Sandbox::Initialize()
          if (((Parameter*)obj)->NeedsForces())
             ((Parameter*)obj)->SetTransientForces(&transientForces);
       }
+
+      if (obj->IsOfType(Gmat::EPHEMERIS_FILE))
+         ((EphemerisFile*)obj)->SetTransientForces(&transientForces);
    }
    // Set transient force vector on Parameters in the GOM that need it
    for (std::map<std::string,GmatBase*>::iterator i = globalObjectMap.begin();

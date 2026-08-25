@@ -1312,12 +1312,10 @@ bool EstimationStateManager::MapVectorToObjects()
          msg << stateMap[index]->subelement;
          std::string lbl = stateMap[index]->objectFullName + "." + 
             stateMap[index]->elementName + "." + msg.str() + " = ";
-         MessageInterface::ShowMessage("   %d: %s%.12lf . Its dot = %.15le for object <%s, %s, %p>   parameterID = %d  parameterType = %d\n", index, lbl.c_str(),
-            state[index], state.GetStateDot()[index], stateMap[index]->object->GetName().c_str(), stateMap[index]->object->GetFullName().c_str(), stateMap[index]->object, 
+         MessageInterface::ShowMessage("   %d: %s%.12lf for object <%s, %s, %p>   parameterID = %d  parameterType = %d\n", index, lbl.c_str(),
+            state[index], stateMap[index]->object->GetName().c_str(), stateMap[index]->object->GetFullName().c_str(), stateMap[index]->object, 
             stateMap[index]->parameterID, stateMap[index]->parameterType);
       #endif
-   
-      Rvector3 acceleration;
 
       bool prevChoice = true;
       if (stateMap[index]->object->IsOfType("Plate"))
@@ -1332,32 +1330,6 @@ bool EstimationStateManager::MapVectorToObjects()
             (stateMap[index]->object)->SetRealParameter(
                stateMap[index]->parameterID, state[index]);
             
-            if (stateMap[index]->object->IsOfType(Gmat::SPACECRAFT))
-            {
-               Integer accelIndex = stateMap[index]->parameterID - (cartesianStateID + 3);
-
-               #ifdef DEBUG_OBJECT_UPDATES
-                  MessageInterface::ShowMessage("accelIndex = %d - %d = %d\n",
-                     stateMap[index]->parameterID, (cartesianStateID + 3), accelIndex);
-               #endif
-
-               if ((stateMap[index]->parameterID - (cartesianStateID + 3)) == 0)
-               {
-                  acceleration[0] = (state.GetStateDot())[index];
-                  acceleration[1] = (state.GetStateDot())[index+1];
-                  acceleration[2] = (state.GetStateDot())[index+2];
-
-                  #ifdef DEBUG_OBJECT_UPDATES
-                     MessageInterface::ShowMessage("    acceleration = [%.15le   %.15le   %.15le]\n",
-                        acceleration[0], acceleration[1], acceleration[2]);
-                  #endif
-
-                  ((Spacecraft*)(stateMap[index]->object))->SetAcceleration(acceleration);
-
-                  // clear its value for the next acceleration value setting
-                  acceleration.Set(0.0, 0.0, 0.0);
-               }
-            }
             break;
          }
          case Gmat::RVECTOR_TYPE:
@@ -1454,8 +1426,6 @@ bool EstimationStateManager::MapFullVectorToObjects()
       "   Epoch = %s\n", state.GetEpochGT().ToString().c_str());
 #endif
 
-   Rvector3 acceleration;
-
    for (Integer index = 0; index < stateSize; ++index)
    {
       Real fullState = state[index];
@@ -1478,21 +1448,6 @@ bool EstimationStateManager::MapFullVectorToObjects()
          (stateMap[index]->object)->SetRealParameter(
             stateMap[index]->parameterID, fullState);
 
-         if (stateMap[index]->object->IsOfType(Gmat::SPACECRAFT))
-         {
-            Integer accelIndex = stateMap[index]->parameterID - (cartesianStateID + 3);
-            if ((0 <= accelIndex) && (accelIndex < 3))
-            {
-               acceleration[accelIndex] = (state.GetStateDot())[index];
-               if (accelIndex == 2)
-               {
-                  ((Spacecraft*)(stateMap[index]->object))->SetAcceleration(acceleration);
-
-                  // clear its value for the next acceleration value setting
-                  acceleration.Set(0.0, 0.0, 0.0);
-               }
-            }
-         }
          break;
       }
       case Gmat::RVECTOR_TYPE:
@@ -1587,31 +1542,6 @@ bool EstimationStateManager::MapObjectsToVector()
          {
             state[index] = stateMap[index]->object->GetRealParameter(
                stateMap[index]->parameterID);
-            
-            // Update stateDot
-            //state.GetStateDot()[index] = 0.0;
-
-            if (stateMap[index]->object->IsOfType(Gmat::SPACECRAFT))
-            {
-               Integer idx = stateMap[index]->parameterID - cartesianStateID;
-               if (idx == 5)
-               {
-                  for (Integer k = 0; k < 3; ++k)
-                     (state.GetStateDot())[index - 5 + k] = state[index - 2 + k];
-
-                  Rvector3 accel = ((Spacecraft*)(stateMap[index]->object))->GetAcceleration();
-                  for (Integer k = 3; k < 6; ++k)
-                     (state.GetStateDot())[index - 5 + k] = accel[k - 3];
-
-                  #ifdef DEBUG_OBJECT_MAPPING
-                     for (Integer k = 0; k < 6; ++k)
-                     {
-                        MessageInterface::ShowMessage("    stateDot[%d] = %.15le\n",
-                          index - 5 + k, (state.GetStateDot())[index - 5 + k]);
-                     }
-                  #endif
-               }
-            }
 
             break;
          }
@@ -1689,8 +1619,8 @@ bool EstimationStateManager::MapObjectsToVector()
          msg << stateMap[index]->subelement;
          std::string lbl = stateMap[index]->objectFullName + "." + 
             stateMap[index]->elementName + "." + msg.str() + " = ";
-         MessageInterface::ShowMessage("   %d: %s%.12lf.  Its dot is %.15le\n", index, lbl.c_str(),
-               state[index], state.GetStateDot()[index]);
+         MessageInterface::ShowMessage("   %d: %s%.12lf.\n", index, lbl.c_str(),
+               state[index]);
       }
    #endif
 
@@ -2425,17 +2355,6 @@ Integer EstimationStateManager::SortVector()
                (*i)->elementID, (*i)->subelement, (*i)->length,
                (*i)->parameterID);
    #endif
-
-
-   // It needs to speicify ID of spacecraft's CartesianState pramater in order to map acceleration values 
-   for (Integer i = 0; i < objects.size(); ++i)
-   {
-      if (objects[i]->IsOfType(Gmat::SPACECRAFT))
-      {
-         cartesianStateID = ((Spacecraft*)(objects[i]))->GetParameterID("CartesianState");
-         break;
-      }
-   }
 
    return stateSize;
 }

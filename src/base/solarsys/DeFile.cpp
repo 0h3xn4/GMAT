@@ -58,12 +58,6 @@
 //#define DEBUG_DEFILE_GET
 
 
-
-///@todo: Option to use the acceleration calculated in DeFile currently disabled.
-//        It will be turned on when it is approved after it is reviewed and tested.
-//#define USE_CALCULATE_ACCELERATION
-
-
 // DE file code from JPL/JSC (Hoffman) includes
 #include <stdio.h>
 #include <math.h>
@@ -338,9 +332,7 @@ Real* DeFile::GetPosVel(Integer forBody, A1Mjd atTime, bool overrideTimeSystem)
 //            "earlier than the beginning of the current DE File; exiting.\n");
    }
 
-   //static Real      result[6];
-   // Adding 3 elements for acceleration
-   static Real      result[9];
+   static Real      result[6];
 
    // if we're asking for the Earth state, return 0.0 (since we're
    // currently assuming Earth-Centered Equatorial
@@ -352,11 +344,6 @@ Real* DeFile::GetPosVel(Integer forBody, A1Mjd atTime, bool overrideTimeSystem)
       result[3] = 0.0;
       result[4] = 0.0;
       result[5] = 0.0;
-
-      // acceleration
-      result[6] = 0.0;
-      result[7] = 0.0;
-      result[8] = 0.0;
 
       return result;
    }
@@ -415,17 +402,6 @@ Real* DeFile::GetPosVel(Integer forBody, A1Mjd atTime, bool overrideTimeSystem)
       result[4] = (Real) rv.Velocity[1] ;
       result[5] = (Real) rv.Velocity[2] ;
 
-      // acceleration
-#ifdef USE_CALCULATE_ACCELERATION
-      result[6] = (Real) rv.Acceleration[0];
-      result[7] = (Real) rv.Acceleration[1];
-      result[8] = (Real) rv.Acceleration[2];
-#else
-      result[6] = 0.0;
-      result[7] = 0.0;
-      result[8] = 0.0;
-#endif
-
       return result;
    }
 
@@ -455,17 +431,6 @@ Real* DeFile::GetPosVel(Integer forBody, A1Mjd atTime, bool overrideTimeSystem)
    result[3] = rv.Velocity[0] -(emrv.Velocity[0] - (mrv.Velocity[0] / (R1.EMRAT + 1.0)));
    result[4] = rv.Velocity[1] -(emrv.Velocity[1] - (mrv.Velocity[1] / (R1.EMRAT + 1.0)));
    result[5] = rv.Velocity[2] -(emrv.Velocity[2] - (mrv.Velocity[2] / (R1.EMRAT + 1.0)));
-
-   // acceleartion
-#ifdef USE_CALCULATE_ACCELERATION
-   result[6] = rv.Acceleration[0] - (emrv.Acceleration[0] - (mrv.Acceleration[0] / (R1.EMRAT + 1.0)));
-   result[7] = rv.Acceleration[1] - (emrv.Acceleration[1] - (mrv.Acceleration[1] / (R1.EMRAT + 1.0)));
-   result[8] = rv.Acceleration[2] - (emrv.Acceleration[2] - (mrv.Acceleration[2] / (R1.EMRAT + 1.0)));
-#else
-   result[6] = 0.0;
-   result[7] = 0.0;
-   result[8] = 0.0;
-#endif
 
    #ifdef DEBUG_DEFILE_GET
    MessageInterface::ShowMessage
@@ -503,9 +468,7 @@ Real* DeFile::GetPosVel(Integer forBody, GmatTime atTime, bool overrideTimeSyste
       //            "earlier than the beginning of the current DE File; exiting.\n");
    }
    
-   //static Real      result[6];
-   // Adding 3 elements for acceleration
-   static Real      result[9];
+   static Real      result[6];
 
    // if we're asking for the Earth state, return 0.0 (since we're
    // currently assuming Earth-Centered Equatorial
@@ -517,11 +480,6 @@ Real* DeFile::GetPosVel(Integer forBody, GmatTime atTime, bool overrideTimeSyste
       result[3] = 0.0;
       result[4] = 0.0;
       result[5] = 0.0;
-
-      // acceleration
-      result[6] = 0.0;
-      result[7] = 0.0;
-      result[8] = 0.0;
 
       return result;
    }
@@ -580,16 +538,6 @@ Real* DeFile::GetPosVel(Integer forBody, GmatTime atTime, bool overrideTimeSyste
       result[4] = (Real)rv.Velocity[1];
       result[5] = (Real)rv.Velocity[2];
 
-      // acceleration
-#ifdef USE_CALCULATE_ACCELERATION
-      result[6] = (Real)rv.Acceleration[0];
-      result[7] = (Real)rv.Acceleration[1];
-      result[8] = (Real)rv.Acceleration[2];
-#else
-      result[6] = 0.0;
-      result[7] = 0.0;
-      result[8] = 0.0;
-#endif
       return result;
    }
 
@@ -619,17 +567,6 @@ Real* DeFile::GetPosVel(Integer forBody, GmatTime atTime, bool overrideTimeSyste
    result[3] = rv.Velocity[0] - (emrv.Velocity[0] - (mrv.Velocity[0] / (R1.EMRAT + 1.0)));
    result[4] = rv.Velocity[1] - (emrv.Velocity[1] - (mrv.Velocity[1] / (R1.EMRAT + 1.0)));
    result[5] = rv.Velocity[2] - (emrv.Velocity[2] - (mrv.Velocity[2] / (R1.EMRAT + 1.0)));
-
-   // acceleartion
-#ifdef USE_CALCULATE_ACCELERATION
-   result[6] = rv.Acceleration[0] - (emrv.Acceleration[0] - (mrv.Acceleration[0] / (R1.EMRAT + 1.0)));
-   result[7] = rv.Acceleration[1] - (emrv.Acceleration[1] - (mrv.Acceleration[1] / (R1.EMRAT + 1.0)));
-   result[8] = rv.Acceleration[2] - (emrv.Acceleration[2] - (mrv.Acceleration[2] / (R1.EMRAT + 1.0)));
-#else
-   result[6] = 0.0;
-   result[7] = 0.0;
-   result[8] = 0.0;
-#endif
 
 #ifdef DEBUG_DEFILE_GET
    MessageInterface::ShowMessage
@@ -1906,7 +1843,6 @@ void DeFile::Interpolate_State(double Time , int Target, stateType *p)
       double dTcdt = 2.0 * ((double) G) / (T_span * GmatTimeConstants::SECS_PER_DAY);
       // Reverse to the origin code to calculate velocity in order to prevent a tiny change in result
       //X.Velocity[i] = V_Sum[i] * dTcdt;
-      X.Acceleration[i] = A_Sum[i] * dTcdt * dTcdt;
    }
 
    /*--------------------------------------------------------------------------*/
@@ -2058,7 +1994,6 @@ void DeFile::Interpolate_State(GmatTime Time, int Target, stateType *p)
       double dTcdt = 2.0 * ((double)G) / T_span / GmatTimeConstants::SECS_PER_DAY;
       // Reverse to the origin code to calculate velocity in order to prevent a tiny change in result
       //X.Velocity[i] = V_Sum[i] * dTcdt; 
-      X.Acceleration[i] = A_Sum[i] * dTcdt *dTcdt;
    }
 
    /*--------------------------------------------------------------------------*/

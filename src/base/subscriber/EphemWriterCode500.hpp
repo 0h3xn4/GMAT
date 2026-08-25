@@ -50,9 +50,8 @@ protected:
    bool        code500WriteFailed;
    
    // Abstract methods required by all subclasses
-   // virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21]); 
    virtual void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21],
-                                const Real accel[3], const Real quat[4]);
+                                const Real quat[4], const Real accel[3]);
 
    // Initialization
    virtual void CreateEphemerisFile(bool useDefaultFileName,

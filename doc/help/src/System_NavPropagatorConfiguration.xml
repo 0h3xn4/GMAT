@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry version="5.0" xml:id="NavPropagatorConfiguration"
-          xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude"
-          xmlns:svg="http://www.w3.org/2000/svg"
-          xmlns:m="http://www.w3.org/1998/Math/MathML"
-          xmlns:html="http://www.w3.org/1999/xhtml"
-          xmlns:db="http://docbook.org/ns/docbook">
+          xmlns="http://docbook.org/ns/docbook">
   <indexterm>
     <primary>Propagator</primary>
   </indexterm>
@@ -36,18 +30,6 @@
 
   <refsection xml:id="Propagator_Estimation_Considerations">
     <title>Use of Propagators in Estimation</title>
-
-    <para>As noted elsewhere in this documentation, all estimators
-    (<guilabel>BatchEstimator</guilabel>,
-    <guilabel>ExtendedKalmanFilter</guilabel>, and
-    <guilabel>Smoother</guilabel>) currently require fixed-step integration.
-    The <guilabel>ErrorControl</guilabel> parameter of the force model used by
-    the estimator must be set to 'None'. Step size for fixed-step integration
-    is configured on the propagator <guilabel>InitialStepSize</guilabel> and
-    <guilabel>MaxStep</guilabel> fields. The smaller of the two values
-    assigned to these parameters will be the integration step size. It is
-    usually convenient to set both to the same value, to avoid
-    confusion.</para>
 
     <para>In the most common case, running estimation for a single spacecraft,
     the user will configure a single numerical integrator according to the

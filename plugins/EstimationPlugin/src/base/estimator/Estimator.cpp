@@ -164,6 +164,8 @@ const Real Estimator::MATLAB_DATE_CONVERSION = 730486.5 - GmatTimeConstants::MJD
 
 const Real Estimator::COV_INV_TOL = std::numeric_limits<Real>::epsilon();
 
+bool Estimator::WSAStartupCalled = false;
+
 //------------------------------------------------------------------------------
 // public methods
 //------------------------------------------------------------------------------
@@ -651,56 +653,6 @@ bool Estimator::Initialize()
                   propagatorSatMap[propagators[0]->GetName()].push_back(trcNamesList[k]);
          }
       }
-
-      // comment this out for now for testing with RSSStep
-      std::string propSettingError;
-      for (UnsignedInt i = 0; i < propagators.size(); ++i)
-      {
-         ODEModel *ode = propagators[i]->GetODEModel();
-         if (ode)
-         {
-            if (ode->GetStringParameter("ErrorControl") != "None")
-            {
-               propSettingError += "GMAT navigation requires use of fixed "
-                  "stepped propagation. The ErrorControl parameter specified for "
-                  "the ForceModel resource associated with the propagator, ";
-               propSettingError += propagatorNames[i];
-               propSettingError += ", used  with the ";
-               propSettingError += typeName;
-               propSettingError += " named ";
-               propSettingError += instanceName;
-               propSettingError += " must be 'None.' Of course, when using fixed step "
-                     "control, the user must choose a step size, as given by the "
-                     "Propagator InitialStepSize field, for the chosen orbit regime "
-                     "and force profile, that yields the desired accuracy.\n";
-            }
-
-            // Ensure only one harmonic gravity model except in testing mode
-            if (!GmatGlobal::Instance()->InTestingMode())
-            {
-               if (ode->GetForce("GravityField", 1) != NULL)
-               {
-                  propSettingError += "GMAT navigation requires use of at most "
-                     "one spherical harmonic gravity model in numerical "
-                     "propagation. The \"PrimaryBodies\" parameter specified for "
-                     "the ForceModel resource associated with the propagator, ";
-                  propSettingError += propagatorNames[i];
-                  propSettingError += ", used  with the ";
-                  propSettingError += typeName;
-                  propSettingError += " named ";
-                  propSettingError += instanceName;
-                  propSettingError += " contains too many entries.\n";
-               }
-            }
-         }
-         // If initializing an estimator, throw error if contains TLE propagator
-         if (propagators[i]->GetPropagator()->GetTypeName()=="SPICESGP4")
-         {
-            propSettingError += "GMAT navigation does not currently support the use of TLE propagators.\n";
-         }
-      }
-      if (propSettingError != "")
-         throw EstimatorException(propSettingError);
 
       // Check the names of measurement models shown in est.AddData have to be the names of created objects
       std::vector<TrackingFileSet*> tfs = measManager.GetAllTrackingFileSets();
@@ -2270,7 +2222,7 @@ const StringArray& Estimator::GetRefObjectNameArray(const UnsignedInt type)
       if ((type == Gmat::UNKNOWN_OBJECT) || (type == Gmat::PROP_SETUP))
       {
          #ifdef DEBUG_ESTIMATOR_INITIALIZATION
-            MessageInterface::ShowMessage("   Adding propagators:\n")
+            MessageInterface::ShowMessage("   Adding propagators:\n");
             for (UnsignedInt i = 0; i < propagatorNames.size(); ++i)
             {
                MessageInterface::ShowMessage("      %s\n",
@@ -2939,8 +2891,7 @@ void Estimator::PlotResiduals()
 {
    #ifdef DEBUG_RESIDUAL_PLOTS
       MessageInterface::ShowMessage("Entered PlotResiduals\n");
-      MessageInterface::ShowMessage("Processing plot with %d Residuals\n",
-            measurementResiduals.size());
+      MessageInterface::ShowMessage("Processing plot\n");
    #endif
    
    std::vector<RealArray*> dataBlast;
@@ -6175,22 +6126,38 @@ std::string Estimator::GetOperatingSystemVersion()
 //----------------------------------------------------------------------------
 std::string Estimator::GetHostName()
 {
-   std::string hostName = "";
+#ifdef _MSC_VER
+   if (!WSAStartupCalled)
+   {
+      WSADATA WsaDat;
+      if (WSAStartup(MAKEWORD(1, 1), &WsaDat) != 0)
+         return std::string("(unknown host)");
+
+      WSAStartupCalled = true;
+   }
+#endif
+
    char s[256];
 #ifdef __linux__
-   gethostname(s, sizeof(s));
+   if (gethostname(s, sizeof(s)) != 0)
+      return std::string("(unknown host)");
+
+   return std::string(s);
 #else
 #ifdef __APPLE__
-   gethostname(s, sizeof(s));
+   if (gethostname(s, sizeof(s)) != 0)
+      return std::string("(unknown host)");
+
+   return std::string(s);
 #endif
 #endif
 
 #ifdef _MSC_VER
-   gethostname(s, sizeof(s));
-#endif
+   if (gethostname(s, sizeof(s)) != 0)
+      return std::string("(unknown host)");
 
-   hostName.assign(s);
-   return hostName.c_str();
+   return std::string(s);
+#endif
 }
 
 
@@ -11260,6 +11227,11 @@ void Estimator::AddJsonObservationData(const MeasurementInfoType &measStat)
          }
          formatter << "]";
       }
+      output = output + formatter.str();
+      formatter.str("");
+
+      //TransmitFreq
+      formatter << ", \"TransmitFreq\" : " << measStat.frequency;
       output = output + formatter.str();
       formatter.str("");
 

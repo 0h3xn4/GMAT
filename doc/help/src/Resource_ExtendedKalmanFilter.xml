@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry version="5.0" xml:id="ExtendedKalmanFilter"
-          xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude"
-          xmlns:svg="http://www.w3.org/2000/svg"
-          xmlns:m="http://www.w3.org/1998/Math/MathML"
-          xmlns:html="http://www.w3.org/1999/xhtml"
-          xmlns:db="http://docbook.org/ns/docbook">
+          xmlns="http://docbook.org/ns/docbook">
   <indexterm>
     <primary>ExtendedKalmanFilter</primary>
   </indexterm>
@@ -1146,17 +1140,6 @@
   <refsection>
     <title>Remarks</title>
 
-    <note>
-      <para>When configuring a numerical integrator for the Kalman filter, you
-      must use the fixed-step option. The <code>ErrorControl</code> parameter
-      of the <guilabel>ForceModel</guilabel> in use by the
-      <guilabel>ExtendedKalmanFilter</guilabel> must be set to
-      '<code>None</code>.' Of course, when using fixed step control, the user
-      must choose a step size, as given by the <guilabel>Propagator</guilabel>
-      <code>InitialStepSize</code> field, that yields the desired accuracy for
-      the chosen orbit regime and force profile.</para>
-    </note>
-
     <refsection>
       <title>Filter Startup Modes</title>
 
@@ -1657,7 +1640,8 @@
               <entry>StateTransitionMatrix</entry>
 
               <entry>State transition matrix <inlineequation>
-                  <m:math display="inline">
+                  <m:math display="inline"
+                          xmlns:m="http://www.w3.org/1998/Math/MathML">
                     <m:msub>
                       <m:mi>Φ</m:mi>
 
@@ -1668,7 +1652,8 @@
               role="bold">t<subscript>i-1</subscript></emphasis> to <emphasis
               role="bold">t<subscript>i</subscript></emphasis>, such that
               <inlineequation>
-                  <m:math display="inline">
+                  <m:math display="inline"
+                          xmlns:m="http://www.w3.org/1998/Math/MathML">
                     <m:msub>
                       <m:mi>Φ</m:mi>
 
@@ -1737,7 +1722,8 @@
       calculates the gain, K.</para>
 
       <para><inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:mtext>Let </m:mtext>
 
@@ -1835,7 +1821,8 @@
             </m:mrow>
           </m:math>
         </inlineequation> be the Kalman gain at some time, <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:msub>
                 <m:mi>t</m:mi>
@@ -1845,14 +1832,16 @@
             </m:mrow>
           </m:math>
         </inlineequation> . The use of a positive value for <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:mtext>MeasDeweightingCoefficient</m:mtext>
             </m:mrow>
           </m:math>
         </inlineequation> makes the gain "smaller" and effectively makes the
       measurement at time <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:msub>
                 <m:mi>t</m:mi>
@@ -1863,7 +1852,8 @@
           </m:math>
         </inlineequation> less important in calculating the estimated state at
       time <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:msub>
                 <m:mi>t</m:mi>
@@ -1873,7 +1863,8 @@
             </m:mrow>
           </m:math>
         </inlineequation> . Note that if <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:mtext>MeasDeweightingCoefficient</m:mtext>
 
@@ -1883,7 +1874,8 @@
             </m:mrow>
           </m:math>
         </inlineequation> , then <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:msub>
                 <m:mi>K</m:mi>
@@ -1895,7 +1887,8 @@
         </inlineequation> is the normal Kalman gain.</para>
 
       <para>Let the 3x3 matrix, <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:msubsup>
               <m:mover accent="true">
                 <m:mi>P</m:mi>
@@ -1911,7 +1904,8 @@
         </inlineequation>, be the partition of the state estimation error
       covariance associated with the Cartesian position error states. If
       <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:msqrt>
                 <m:mrow>
@@ -1946,13 +1940,15 @@
           </m:math>
         </inlineequation>, GMAT calculates the Kalman gain using the user
       input value for <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:mtext>MeasDeweightingCoefficient.</m:mtext>
             </m:mrow>
           </m:math>
         </inlineequation> Otherwise, GMAT uses <inlineequation>
-          <m:math display="inline">
+          <m:math display="inline"
+                  xmlns:m="http://www.w3.org/1998/Math/MathML">
             <m:mrow>
               <m:mtext>MeasDeweightingCoefficient</m:mtext>
 

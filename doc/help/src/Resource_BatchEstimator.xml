@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <refentry version="5.0" xml:id="BatchEstimator"
-          xmlns="http://docbook.org/ns/docbook"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:xi="http://www.w3.org/2001/XInclude"
-          xmlns:svg="http://www.w3.org/2000/svg"
-          xmlns:m="http://www.w3.org/1998/Math/MathML"
-          xmlns:html="http://www.w3.org/1999/xhtml"
-          xmlns:db="http://docbook.org/ns/docbook">
+          xmlns="http://docbook.org/ns/docbook">
   <indexterm>
     <primary>BatchEstimator</primary>
   </indexterm>
@@ -1609,21 +1603,6 @@
   <refsection>
     <title>Remarks</title>
 
-    <note>
-      <para>When configuring a numerical integrator for the batch estimator,
-      you must use the fixed-step option. The <code>ErrorControl</code>
-      parameter of the <guilabel>ForceModel</guilabel> used by the
-      <guilabel>BatchEstimator</guilabel> must be set to '<code>None</code>.'
-      Of course, when using fixed step control, the user must choose a step
-      size that yields the desired accuracy for the chosen orbit regime and
-      force profile. Step size for fixed-step integration is configured on the
-      <guilabel>Propagator.InitialStepSize</guilabel> and
-      <guilabel>Propagator.MaxStep</guilabel> fields. The smaller of the two
-      values assigned to these parameters will be the integration step size.
-      It is usually convenient to set both to the same value, to avoid
-      confusion.</para>
-    </note>
-
     <refsection>
       <title>Behavior of Convergence Criteria</title>
 
@@ -1699,7 +1678,7 @@
       the end of the previous iteration. Otherwise, If
       <guilabel>OLSEUseRMSP</guilabel> = False, then RMS =
       <guilabel>WRMS</guilabel> where <guilabel>WRMS</guilabel> is the actual
-      weighted RMS calculated at the end of the previous iteration. </para>
+      weighted RMS calculated at the end of the previous iteration.</para>
 
       <para>In many cases, particularly those where the initial state estimate
       is poor, the predicted WRMS may be too small and use of the predicted
@@ -2396,6 +2375,12 @@ plot(t, part_x);</programlisting>
               list of X, Y, Z measurements. Units are as described in the
               <link linkend="TrackingDataTypes">tracking data types
               description.</link></entry>
+            </row>
+
+            <row>
+              <entry>TransmitFreq</entry>
+
+              <entry>Transmit frequency in Hz</entry>
             </row>
           </tbody>
         </tgroup>

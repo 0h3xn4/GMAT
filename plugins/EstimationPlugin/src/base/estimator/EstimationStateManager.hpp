@@ -241,12 +241,6 @@ private:
 
    /// Get participant's state in MJ2000Eq Cartesian coordinate system
    Rvector                    GetParticipantMJ2000EqCartesianState(GmatBase* spaceObj);
-
-   /// the ID of Spacecraft's CartesianState. It is used for mapping
-   /// spacecarft's acceleration from vector to spacecraft
-   Integer cartesianStateID;
-
-
 };
 
 #endif /* EstimationStateManager_hpp */

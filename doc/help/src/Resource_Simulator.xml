@@ -491,18 +491,6 @@
   <refsection>
     <title>Remarks</title>
 
-    <note>
-      <para>When configuring a numerical integrator for the simulator, you
-      must use the fixed-step option. The <code>ErrorControl</code> parameter
-      specified for the <guilabel>ForceModel</guilabel> resource associated
-      with the <guilabel>Simulator</guilabel> <guilabel>Propagator</guilabel>
-      must be set to '<code>None</code>.' Of course, when using fixed step
-      control, the user must choose a step size, as given by the
-      <guilabel>Propagator</guilabel> <code>InitialStepSize</code> field, for
-      the chosen orbit regime and force profile, that yields the desired
-      accuracy.</para>
-    </note>
-
     <refsection>
       <title>Propagator Settings</title>
 
@@ -637,7 +625,7 @@ simData.FileName          = {'simData.gmd'}
 
 %   Create and configure the Simulator object
 Create ForceModel FM1
-FM1.ErrorControl = None   %Fixed step integration required for Navigation
+FM1.ErrorControl = None
 
 Create Propagator prop
 prop.FM      = FM1

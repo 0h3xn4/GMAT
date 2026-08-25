@@ -63,14 +63,14 @@
 //---------------------------------
 
 //------------------------------------------------------------------------------
-// EphemWriterCCSDS(const std::string &name, const std::string &type = "EphemWriterCCSDS")
+// EphemWriterCCSDS(const std::string &name, const std::string &type = "EphemWriterCCSDS", const std::string& version="1.0")
 //------------------------------------------------------------------------------
 /**
  * Default constructor
  */
 //------------------------------------------------------------------------------
-EphemWriterCCSDS::EphemWriterCCSDS(const std::string &name, const std::string &type) :
-   EphemWriterWithInterpolator(name, type),
+EphemWriterCCSDS::EphemWriterCCSDS(const std::string &name, const std::string& type, const std::string& version) :
+   EphemWriterWithInterpolator(name, type, version),
    ccsdsOemWriter       (NULL),
    ccsdsEpochFormat     ("UTC"),
    metaDataStart        (-999.999),
@@ -84,9 +84,28 @@ EphemWriterCCSDS::EphemWriterCCSDS(const std::string &name, const std::string &t
    firstTimeMetaData    (true),
    saveMetaDataStart    (true)
 {
-   fileType = CCSDS_OEM;
    if (type == "CCSDS-AEM")
+   {
       fileType = CCSDS_AEM;
+
+      if (version == "")
+         ephemVersion = "1.0";
+   }
+   else
+   {
+      fileType = CCSDS_OEM;
+
+      if (version == "")
+         ephemVersion = "1.0";
+   }
+
+   if (ephemVersion != "1.0" && ephemVersion != "2.0")
+   {
+      SubscriberException se;
+      se.SetDetails("**** ERROR **** Invalid CCSDS version : '%s'\n",
+         ephemVersion.c_str());
+      throw se;
+   }
    
    #ifdef DEBUG_EPHEMFILE_INSTANCE
    MessageInterface::ShowMessage
@@ -226,11 +245,7 @@ bool EphemWriterCCSDS::Initialize()
    // Create CCSDS-OEM writer
    if (ccsdsOemWriter == NULL)
    {
-      ccsdsOemWriter = new CCSDSOEMWriter;
-
-      // Specify options to write
-      ccsdsOemWriter->SetWritingAccelerationOption(writeAccelerationOption);
-      ccsdsOemWriter->SetWritingCovarianceOption(writeCovarianceOption);
+      ccsdsOemWriter = new CCSDSOEMWriter(ephemVersion);
    }
 
    // Check if interpolator needs to be created
@@ -293,11 +308,10 @@ void EphemWriterCCSDS::Copy(const EphemerisWriter* orig)
 
 //------------------------------------------------------------------------------
 // void BufferOrbitData(Real epochInDays, const Real state[6], const Real cov[21],
-//                      const Real accel[3])
+//                      const Real quat[4], const Real accel[3])
 //------------------------------------------------------------------------------
 void EphemWriterCCSDS::BufferOrbitData(Real epochInDays, const Real state[6],
-                                       const Real cov[21], const Real accel[3],
-                                       const Real quat[4])
+                                       const Real cov[21], const Real quat[4], const Real accel[3])
 {
    #ifdef DEBUG_EPHEMFILE_BUFFER
    MessageInterface::ShowMessage
@@ -341,16 +355,14 @@ void EphemWriterCCSDS::BufferOrbitData(Real epochInDays, const Real state[6],
    for (Integer i = 0; i < 21; ++i)
       (*covar)[i] = cov[i];
    covArray.push_back(covar);
-   Rvector3 *acc = new Rvector3(accel[0], accel[1], accel[2]);
-   accelArray.push_back(acc);
-   Rvector *rvacov = new Rvector(30);
+   Rvector *rvcov = new Rvector(30);
    for (Integer i = 0; i < 6; ++i)
-      (*rvacov)[i] = state[i];
-   for (Integer i = 0; i < 3; ++i)
-      (*rvacov)[i+6] = accel[i];
+      (*rvcov)[i] = state[i];
    for (Integer i = 0; i < 21; ++i)
-      (*rvacov)[i+9] = cov[i];
-   rvacovArray.push_back(rvacov);
+      (*rvcov)[i + 6] = cov[i];
+   for (Integer i = 0; i < 3; ++i)
+      (*rvcov)[i + 27] = accel[i];
+   rvcovArray.push_back(rvcov);
 
    #ifdef DEBUG_EPHEMFILE_BUFFER
    MessageInterface::ShowMessage
@@ -442,11 +454,7 @@ bool EphemWriterCCSDS::OpenCcsdsEphemerisFile()
    
    if (ccsdsOemWriter == NULL)
    {
-      ccsdsOemWriter = new CCSDSOEMWriter;
-
-      // Specify options to write
-      ccsdsOemWriter->SetWritingAccelerationOption(writeAccelerationOption);
-      ccsdsOemWriter->SetWritingCovarianceOption(writeCovarianceOption);
+      ccsdsOemWriter = new CCSDSOEMWriter(ephemVersion);
    }
    
    retval = ccsdsOemWriter->OpenFile(fullPathFileName);
@@ -551,7 +559,7 @@ void EphemWriterCCSDS::HandleOrbitData()
    #endif
    
    // Check if it is time to write
-   bool timeToWrite = IsTimeToWrite(currEpochInSecs, currState, currCov, currAccel);
+   bool timeToWrite = IsTimeToWrite(currEpochInSecs, currState, currCov, currQuat, currAccel);
    
    #ifdef DEBUG_EPHEMFILE_DATA
    MessageInterface::ShowMessage
@@ -1071,10 +1079,12 @@ void EphemWriterCCSDS::WriteCcsdsHeader()
    // Set header information and then write
    if (ccsdsOemWriter)
    {
-      //ccsdsOemWriter->SetHeaderForWriting("VERSION_NUMBER", "1.0");
       ccsdsOemWriter->SetHeaderForWriting("VERSION_NUMBER", ephemVersion);
       ccsdsOemWriter->SetHeaderForWriting("ORIGINATOR", "GMAT USER");
       ccsdsOemWriter->WriteHeader("CCSDS_OEM_VERS");
+
+      ccsdsOemWriter->SetUseCovariance(covarianceFormat == "PositionAndVelocity");
+      ccsdsOemWriter->SetUseAcceleration(accelModel != NULL);
    }
    
    
@@ -1085,9 +1095,9 @@ void EphemWriterCCSDS::WriteCcsdsHeader()
    std::stringstream ss("");
    
    if (fileType == CCSDS_OEM)
-      ss << "CCSDS_OEM_VERS = 1.0" << std::endl;
+      ss << "CCSDS_OEM_VERS = " << version << std::endl;
    else
-      ss << "CCSDS_AEM_VERS = 1.0" << std::endl;
+      ss << "CCSDS_AEM_VERS = " << version << std::endl;
    
    ss << "CREATION_DATE  = " << creationTime << std::endl;
    ss << "ORIGINATOR     = " << originator << std::endl;
@@ -1224,37 +1234,26 @@ void EphemWriterCCSDS::WriteCcsdsOemMetaData()
          csType = "EME2000";
       else if (csType == "ObjectReferenced")
          csType = "ObjectReferenced";
-      else if (csType == "TODEq" && (origin == "Earth" || GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING))        // made changes by TUAN NGUYEN
+      else if (csType == "TODEq" && origin == "Earth")
          csType = "TOD";
-      else if (csType == "ICRF" && (origin == "Earth" || GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING))         // made changes by TUAN NGUYEN
+      else if (csType == "ICRF" && origin == "Earth")
          csType = "ICRF";
-      else if (csType == "BodyFixed" && (origin == "Earth" || GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING))    // made changes by TUAN NGUYEN
+      else if (csType == "BodyFixed" && origin == "Earth")
          csType = "TDR";
-      else if (csType == "MJ2000Ec" && (origin == "Earth" || GmatGlobal::Instance()->GetRunModeStartUp() == GmatGlobal::TESTING))     // made changes by TUAN NGUYEN
+      else if (csType == "MJ2000Ec" && origin == "Earth")
          csType = "MJ2000Ec";
       else
       {
          std::string msg = "Axes of type " + csType + " are not permitted to be written to a CCSDS Ephemeris file using central body " + origin + ".\n";
-         // if(GmatGlobal::Instance()->GetRunMode() != GmatGlobal::TESTING)         // made changes by TUAN NGUYEN
-         if (GmatGlobal::Instance()->GetRunModeStartUp() != GmatGlobal::TESTING)    // made changes by TUAN NGUYEN
-            throw SubscriberException(msg);
+         throw SubscriberException(msg);
       }
 
       if (origin == "Luna")
          origin = "Moon";
-
    }
 
-   if (covarianceFormat != "None")
-   {
-      if (csType != "EME2000")
-      {
-         std::string msg = "Writing covariance to a CCSDS ephemeris file with a coordinate system other than J2000 is not allowed.\n";
-         // if(GmatGlobal::Instance()->GetRunMode() != GmatGlobal::TESTING)         // made changes by TUAN NGUYEN
-         if (GmatGlobal::Instance()->GetRunModeStartUp() != GmatGlobal::TESTING)    // made changes by TUAN NGUYEN
-            throw SubscriberException(msg);
-      }
-   }
+   if (covarianceFormat != "None" && csType != "EME2000")
+      throw SubscriberException("Writing covariance to a CCSDS ephemeris file with a coordinate system other than J2000 is not allowed.\n");
    
    Integer actualInterpOrder = interpolationOrder;
    Integer numData = a1MjdArray.size();
@@ -1415,24 +1414,20 @@ void EphemWriterCCSDS::WriteCcsdsOemData()
               outState[4], outState[5]);
       dstream << strBuff; 
 
-      outState = accelArray[i]->GetDataVector();
-      sprintf(strBuff, "%s  accel = [% 1.15e  % 1.15e  % 1.15e]\n",
-         epochStr.c_str(), outState[0], outState[1], outState[2]);
-      dstream << strBuff;
-
       dstream.flush();
       #endif
    
       #ifdef DEBUG_EPHEMFILE_WRITE
-      MessageInterface::ShowMessage("rvacov array size = %d\n", (*rvacovArray[i]).GetSize());
-      for (Integer k = 0; k < (*rvacovArray[i]).GetSize(); ++k)
-         MessageInterface::ShowMessage("  (*rvacovArray[i])[%d] = %.15le\n", k, (*rvacovArray[i])[k]);
+      MessageInterface::ShowMessage("rvcov array size = %d\n", (*rvcovArray[i]).GetSize());
+      for (Integer k = 0; k < (*rvcovArray[i]).GetSize(); ++k)
+         MessageInterface::ShowMessage("  (*rvcovArray[i])[%d] = %.15le\n", k, (*rvcovArray[i])[k]);
       #endif
 
       // Add data points to ccsds writer and then write
       // This code changes is used to add acceleration and covarian matrix to funtion AddDataForWriting()
-      //if (ccsdsOemWriter && ccsdsOemWriter->AddDataForWriting(epoch, *stateArray[i]))
-      if (ccsdsOemWriter && ccsdsOemWriter->AddDataForWriting(epoch, *rvacovArray[i]))
+
+      Rvector data = *rvcovArray[i];
+      if (ccsdsOemWriter && ccsdsOemWriter->AddDataForWriting(epoch, data))
       {
          dataAdded = true;
       }

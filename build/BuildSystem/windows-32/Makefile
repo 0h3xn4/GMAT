@@ -11,7 +11,7 @@ GMAT_SRC_GUI_DIR = $(GMAT_DIR)/src/gui
 GMAT_PLUGIN_DIR = $(GMAT_HOME)/gmat-internal/code
 GMAT_OFI_DIR = $(GMAT_HOME)/OpenFramesInterface
 GMAT_BUILD_DIR = $(GMAT_DIR)/build
-GMAT_INSTALL_DIR = $(GMAT_DIR)/GMAT-R2025a-Windows-x64
+GMAT_INSTALL_DIR = $(GMAT_DIR)/GMAT-R2026a-Windows-x64
 GMAT_BIN_DIR = $(GMAT_DIR)/application/bin
 GMAT_MATLAB_CINTF_DIR = $(GMAT_DIR)/application/matlab/libCInterface
 GMAT_PLUGIN_BIN_DIR = $(GMAT_DIR)/application/plugins
@@ -83,7 +83,7 @@ dist:
 	cp help-a4.pdf $(DAILY_HELP_DEST_DIR); \
 	cp help-letter.pdf $(DAILY_HELP_DEST_DIR) \
 	cp help.html $(DAILY_HELP_DEST_DIR); \
-	cp help.chm $(DAILY_HELP_DEST_DIR); \
+	#cp help.chm $(DAILY_HELP_DEST_DIR); \
 	cp -r $(GMAT_HELP_BUILD_DIR)/html $(DAILY_HELP_DEST_DIR);  \
 	cp -r $(GMAT_HELP_BUILD_DIR)/files $(DAILY_HELP_DEST_DIR); \
     

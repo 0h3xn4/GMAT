@@ -323,7 +323,6 @@ CelestialBody::CelestialBody(std::string itsBodyType, std::string name) :
    SetTextureMapFileName(textureMapFileName);
    
    for (Integer i = 0; i < 6; i++) prevState[i] = 0.0;
-   for (Integer i = 0; i < 3; i++) prevAcceleration[i] = 0.0;
 
    #ifdef __USE_SPICE__
       kernelReader = NULL;
@@ -456,7 +455,6 @@ CelestialBody::CelestialBody(Gmat::BodyType itsBodyType, std::string name) :
    for (Integer i = 0; i < Gmat::ModelTypeCount; i++)
       models[i].push_back("None");
    for (Integer i = 0; i < 6; i++) prevState[i] = 0.0;
-   for (Integer i = 0; i < 3; i++) prevAcceleration[i] = 0.0;
    
    #ifdef __USE_SPICE__
       kernelReader = NULL;
@@ -538,9 +536,7 @@ CelestialBody::CelestialBody(const CelestialBody &cBody) :
    lastEphemTime       (cBody.lastEphemTime),
    lastEphemTimeGT     (cBody.lastEphemTimeGT),
    lastState           (cBody.lastState),
-   lastAcceleration    (cBody.lastAcceleration),
    j2kState            (cBody.j2kState),
-   j2kAcceleration     (cBody.j2kAcceleration),
    rotationSrc         (cBody.rotationSrc),
    userDefined         (cBody.userDefined),
    allowSpice          (cBody.allowSpice),
@@ -605,7 +601,6 @@ CelestialBody::CelestialBody(const CelestialBody &cBody) :
       models[i] = cBody.models[i];
    
    for (Integer i = 0; i < 6; i++) prevState[i] = cBody.prevState[i];
-   for (Integer i = 0; i < 3; i++) prevAcceleration[i] = cBody.prevAcceleration[i];
    
    #ifdef DEBUG_CB_CONSTRUCTOR
    MessageInterface::ShowMessage
@@ -715,9 +710,7 @@ CelestialBody& CelestialBody::operator=(const CelestialBody &cBody)
    lastEphemTime       = cBody.lastEphemTime;
    lastEphemTimeGT     = cBody.lastEphemTimeGT;
    lastState           = cBody.lastState;
-   lastAcceleration    = cBody.lastAcceleration;
    j2kState            = cBody.j2kState;
-   j2kAcceleration     = cBody.j2kAcceleration;
    rotationSrc         = cBody.rotationSrc;
    userDefined         = cBody.userDefined;
    allowSpice          = cBody.allowSpice;
@@ -753,7 +746,6 @@ CelestialBody& CelestialBody::operator=(const CelestialBody &cBody)
    defaultOrientationWarningMesssageSent = cBody.defaultOrientationWarningMesssageSent;
    
    for (Integer i = 0; i < 6; i++) prevState[i] = cBody.prevState[i];
-   for (Integer i = 0; i < 3; i++) prevAcceleration[i] = cBody.prevAcceleration[i];
 
    for (Integer i = 0; i < Gmat::ModelTypeCount; i++)
       models[i] = cBody.models[i];
@@ -1243,112 +1235,6 @@ const Rvector6&  CelestialBody::GetState(A1Mjd atTime)
 }
 
 
-
-//------------------------------------------------------------------------------
-//  const Rvector3& GetAcceleration(A1Mjd atTime)
-//------------------------------------------------------------------------------
-/**
- * This method returns the acceleration of the body at the requested time.
- *
- * @param <atTime>  time for which state of the body is requested.
- *
- * @return acceleration of the body at the requested time.
- *
- * @exception <PlanetaryEphemException> thrown when the requested Pos/Vel
- *            source is set, but the source file has not been set.
- */
- //------------------------------------------------------------------------------
-const Rvector3&  CelestialBody::GetAcceleration(A1Mjd atTime)
-{
-   if (!theCentralBody) SetUpBody();
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage
-   ("CelestialBody::GetAcceleration() <%p> '%s' entered with time %.17f\n", this,
-      GetName().c_str(), atTime.Get());
-   MessageInterface::ShowMessage
-   ("   posVelSrc=%d for <%p> %s\n", posVelSrc, this, GetName().c_str());
-   MessageInterface::ShowMessage("   lastEphemTime = %.17f\n", lastEphemTime.Get());
-#endif
-
-   Real dt = Abs(atTime.Subtract(lastEphemTime)) * GmatTimeConstants::SECS_PER_DAY;
-   if (dt < ephemUpdateInterval)
-   {
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage("   returning lastAcceleration %s\n", lastAcceleration.ToString().c_str());
-#endif
-      return lastAcceleration;
-   }
-
-   switch (posVelSrc)
-   {
-   case Gmat::DE405:
-   case Gmat::DE421:
-   case Gmat::DE424:
-      //      case Gmat::DE430 :
-   {
-      if (!theSourceFile)
-      {
-         throw PlanetaryEphemException(
-            "DE file requested, but no file specified");
-      }
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage
-      ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-         this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, atTime.GetReal(),
-         overrideTime ? "true" : "false");
-#endif
-      Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      acceleration.Set(posVelAccel[6], posVelAccel[7], posVelAccel[8]);
-      break;
-   }
-   case Gmat::SPICE:
-   {
-      #ifdef __USE_SPICE__
-         if (!spiceSetupDone) SetUpSPICE();
-       
-         //Rvector3 spiceAcceleration = kernelReader->GetTargetAcceleration(naifName, naifId, atTime, j2000BodyName, naifIdObserver);
-         //acceleration.Set(spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
- 
-         // SPICE has no function use for calculating acceleration. Therefore, we set it to zero vector and set a warning about incorrect acceleration
-         Rvector3 spiceAcceleration(0.0, 0.0, 0.0);
-         acceleration.Set(spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
-
-         #ifdef DEBUG_CB_SPICE_VS_DE
-            Real* dePosVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-            MessageInterface::ShowMessage("for body %s, for time: %12.10f:\n", instanceName.c_str(), atTime.Get());
-            MessageInterface::ShowMessage("     SPICE acceleration is: %12.10f  %12.10f  %12.10f\n",
-               spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
-            MessageInterface::ShowMessage("     DE state is:    %12.10f  %12.10f  %12.10f\n",
-               dePosVelAccel[6], dePosVelAccel[7], dePosVelAccel[8]);
-         #endif
-      #else
-         // Throw an error if GMAT was not build with __USE_SPICE__ (LOJ: 2010.05.18)
-         std::string errmsg = "Use of SPICE file was disabled";
-         throw SolarSystemException(errmsg);
-      #endif
-      break;
-   }
-   default:
-      throw SolarSystemException("Invalid data source defined for body "
-         + instanceName);
-      break;
-   }
-   stateTime = atTime;
-   lastEphemTime = atTime;
-   lastAcceleration = acceleration;
-
-   for (Integer i = 0; i < 3; i++)
-      prevAcceleration[i] = lastAcceleration[i];
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage("   returning acceleration %s\n", state.ToString().c_str());
-#endif
-
-   return acceleration;
-}
-
-
 //------------------------------------------------------------------------------
 //  const Rvector6& GetState(GmatTime atTime)
 //------------------------------------------------------------------------------
@@ -1466,118 +1352,6 @@ const Rvector6&  CelestialBody::GetState(GmatTime atTime)
 #endif
 
    return state;
-}
-
-
-
-//------------------------------------------------------------------------------
-//  const Rvector3& GetAcceleration(GmatTime atTime)
-//------------------------------------------------------------------------------
-/**
-* This method returns the acceleration of the body at the requested time.
-*
-* @param <atTime>  time for which state of the body is requested.
-*
-* @return acceleration of the body at the requested time.
-*
-* @exception <PlanetaryEphemException> thrown when the requested Pos/Vel
-*            source is set, but the source file has not been set.
-*/
-//------------------------------------------------------------------------------
-const Rvector3&  CelestialBody::GetAcceleration(GmatTime atTime)
-{
-   if (!theCentralBody) SetUpBody();
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage
-   ("CelestialBody::GetAcceleration() <%p> '%s' entered with time %.17f\n", this,
-      GetName().c_str(), atTime.GetMjd());
-   MessageInterface::ShowMessage
-   ("   posVelSrc=%d for <%p> %s\n", posVelSrc, this, GetName().c_str());
-   MessageInterface::ShowMessage("   lastEphemTimeGT = %.17f\n", lastEphemTimeGT.GetMjd());
-#endif
-
-   Real dt = Abs((atTime - lastEphemTimeGT).GetTimeInSec());
-   if (dt < ephemUpdateInterval)
-   {
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage("   returning lastAcceleration %s\n", lastAcceleration.ToString().c_str());
-#endif
-      return lastAcceleration;
-   }
-
-   switch (posVelSrc)
-   {
-   case Gmat::DE405:
-   case Gmat::DE421:
-   case Gmat::DE424:
-      //      case Gmat::DE430 :
-   {
-      if (!theSourceFile)
-      {
-         throw PlanetaryEphemException(
-            "DE file requested, but no file specified");
-      }
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage
-      ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-         this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, atTime.GetMjd(),
-         overrideTime ? "true" : "false");
-#endif
-      Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      acceleration.Set(posVelAccel[6], posVelAccel[7], posVelAccel[8]);
-      break;
-   }
-   case Gmat::SPICE:
-   {
-#ifdef __USE_SPICE__
-      if (!spiceSetupDone) SetUpSPICE();
-      if (!isGmatTimeWarning)
-      {
-         MessageInterface::ShowMessage("Warning: SPICE does not handle GmatTime. Value of GmatTime was convert to GmatEpoch.\n");
-         isGmatTimeWarning = true;
-      }
-
-      //Rvector3 spiceAcceleration = kernelReader->GetTargetAcceleration(naifName, naifId, atTime, j2000BodyName, naifIdObserver);
-      // SPICE has no function calculate acceleration. Therefore, we set acceleration to zero vector and make a warning about incorrect acceleartion
-      Rvector3 spiceAcceleration(0.0, 0.0, 0.0);
-      acceleration.Set(spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
- 
-      #ifdef DEBUG_CB_SPICE_VS_DE
-      Real* dePosVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      MessageInterface::ShowMessage("for body %s, for time: %12.10f:\n", instanceName.c_str(), atTime.GetMjd());
-      MessageInterface::ShowMessage("     SPICE state is: %12.10f  %12.10f  %12.10f\n",
-         spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
-      MessageInterface::ShowMessage("     DE state is:    %12.10f  %12.10f  %12.10f\n",
-         dePosVelAccel[6], dePosVelAccel[7], dePosVelAccel[8]);
-      #endif
-#else
-      // Throw an error if GMAT was not build with __USE_SPICE__ (LOJ: 2010.05.18)
-      std::string errmsg = "Use of SPICE file was disabled";
-      throw SolarSystemException(errmsg);
-#endif
-      break;
-   }
-   default:
-      throw SolarSystemException("Invalid data source defined for body "
-         + instanceName);
-      break;
-   }
-   stateTimeGT = atTime;
-   stateTime = atTime.GetMjd();
-   lastEphemTimeGT = atTime;
-   lastEphemTime = atTime.GetMjd();
-
-   lastAcceleration = acceleration;
-
-   for (Integer i = 0; i < 3; i++)
-      prevAcceleration[i] = lastAcceleration[i];
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage("   returning acceleration %s\n", acceleration.ToString().c_str());
-#endif
-
-   return acceleration;
 }
 
 
@@ -1794,28 +1568,6 @@ const Rvector6&  CelestialBody::GetState(Real atTime)
 }
 
 
-
-//------------------------------------------------------------------------------
-//  const Rvector3& GetAcceleration(Real atTime)
-//------------------------------------------------------------------------------
-/**
- * This method returns the acceleration of the body at the requested time.
- *
- * @param <atTime>  time for which state of the body is requested.
- *
- * @return acceleration of the body at the requested time.
- *
- * @exception <PlanetaryEphemException> thrown when the requested Pos/Vel
- *            source is set, but the source file has not been set.
- */
- //------------------------------------------------------------------------------
-const Rvector3&  CelestialBody::GetAcceleration(Real atTime)
-{
-   A1Mjd forTime(atTime);
-   return GetAcceleration(forTime);
-}
-
-
 //------------------------------------------------------------------------------
 // void GetState(const A1Mjd &atTime, Real *outState)
 //------------------------------------------------------------------------------
@@ -1953,135 +1705,6 @@ void CelestialBody::GetState(const A1Mjd &atTime, Real *outState)
    
    for (Integer i=0;i<6;i++)
       prevState[i] = outState[i];
-   
-   #ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage("Exiting GetState -------------f\n");
-   #endif
-}
-
-
-
-//------------------------------------------------------------------------------
-// void GetAcceleration(const A1Mjd &atTime, Real *outAcceleration)
-//------------------------------------------------------------------------------
-/**
- * This method returns the acceleration of the body at the requested time.
- *
- * @param <atTime>          time for which state of the body is requested.
- * @param <outAcceleration> output resulting acceleration
- *
- * @exception <PlanetaryEphemException> thrown when the requested Pos/Vel
- *            source is set, but the source file has not been set.
- */
-//------------------------------------------------------------------------------
-void CelestialBody::GetAcceleration(const A1Mjd &atTime, Real *outAcceleration)
-{
-   #ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage("Entering GetAcceleration with time %.17f\n",
-      atTime.Get());
-   #endif
-      
-   if (!theCentralBody) SetUpBody();
-
-   Real dt = Abs(atTime.Subtract(lastEphemTime)) * GmatTimeConstants::SECS_PER_DAY;
-   if ( dt < ephemUpdateInterval)
-   {
-      for (Integer i=0;i<3;i++) outAcceleration[i] = prevAcceleration[i];
-   }
-   
-   switch (posVelSrc)
-   {
-      case Gmat::DE405 :
-      {
-         if (!theSourceFile)
-         {
-            throw PlanetaryEphemException(
-               "DE 405 file requested, but no file specified");
-         }
-#ifdef DEBUG_GET_STATE
-         MessageInterface::ShowMessage
-         ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-            this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, atTime.GetReal(),
-            overrideTime ? "true" : "false");
-#endif
-
-         Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-         for (Integer i = 0; i < 3; i++) outAcceleration[i] = posVelAccel[i + 6];
-
-         break;
-      }
-      case Gmat::DE421 :
-      {
-         if (!theSourceFile)
-         {
-            throw PlanetaryEphemException(
-               "DE 421 file requested, but no file specified");
-         }
-#ifdef DEBUG_GET_STATE
-         MessageInterface::ShowMessage
-         ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-            this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, atTime.GetReal(),
-            overrideTime ? "true" : "false");
-#endif
-         Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-         for (Integer i = 0; i < 3; i++) outAcceleration[i] = posVelAccel[i + 6];
-
-         break;
-      }
-      case Gmat::DE424 :
-      {
-         if (!theSourceFile)
-         {
-            throw PlanetaryEphemException(
-               "DE 424 file requested, but no file specified");
-         }
-#ifdef DEBUG_GET_STATE
-         MessageInterface::ShowMessage
-         ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-            this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, atTime.GetReal(),
-            overrideTime ? "true" : "false");
-#endif
-         Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-         for (Integer i = 0; i < 3; i++) outAcceleration[i] = posVelAccel[i + 6];
-
-         break;
-      }
-      case Gmat::SPICE :
-      {
-#ifdef __USE_SPICE__
-         if (!spiceSetupDone) SetUpSPICE();
-
-         // SPICE has no function used for calculating acceleration. Therefore, we set it to zero vector and make a warning about incorrect acceleration
-         //spiceAcceleration = kernelReader->GetTargetAcceleration(naifName, naifId, atTime, j2000BodyName, naifIdObserver);
-         Rvector3 spiceAcceleration(0.0, 0.0, 0.0);
-         for (Integer i = 0; i < 3; i++) outAcceleration[i] = spiceAcceleration[i];
-
-#ifdef DEBUG_CB_SPICE_VS_DE
-         Real* dePosVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-         MessageInterface::ShowMessage("for body %s, for time: %12.10f:\n", instanceName.c_str(), atTime.Get());
-         MessageInterface::ShowMessage("     SPICE state is: %12.10f  %12.10f  %12.10f\n",
-            spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
-         MessageInterface::ShowMessage("     DE state is:    %12.10f  %12.10f  %12.10f\n",
-            dePosVelAccel[6], dePosVelAccel[7], dePosVelAccel[8]);
-#endif
-
-#endif
-
-         break;
-      }
-      default:
-         throw SolarSystemException("Invalid data source defined for body "
-                                    + instanceName);
-         break;
-   }
-   
-   stateTime     = atTime;
-   lastEphemTime = atTime;
-   acceleration.Set(outAcceleration[0],outAcceleration[1],outAcceleration[2]);
-   lastAcceleration.Set(outAcceleration[0],outAcceleration[1],outAcceleration[2]);
-   
-   for (Integer i=0;i<3;i++)
-      prevAcceleration[i] = outAcceleration[i];
    
    #ifdef DEBUG_GET_STATE
       MessageInterface::ShowMessage("Exiting GetState -------------f\n");
@@ -2232,157 +1855,6 @@ void CelestialBody::GetState(const GmatTime &atTime, Real *outState)
 
 #ifdef DEBUG_GET_STATE
    MessageInterface::ShowMessage("Exiting GetState -------------\n");
-#endif
-}
-
-
-
-//------------------------------------------------------------------------------
-// void GetAcceleration(const GmatTime &atTime, Real *outAcceleration)
-//------------------------------------------------------------------------------
-/**
-* This method returns the acceleartion of the body at the requested time.
-*
-* @param <atTime>            time for which state of the body is requested.
-* @param <outAcceleration>   output resulting acceleration
-*
-* @exception <PlanetaryEphemException> thrown when the requested Pos/Vel
-*            source is set, but the source file has not been set.
-*/
-//------------------------------------------------------------------------------
-void CelestialBody::GetAcceleration(const GmatTime &atTime, Real *outAcceleration)
-{
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage("Entering GetAcceleration with time %.17f\n",
-      GmatTime(atTime).GetMjd());
-#endif
-
-   if (!theCentralBody) SetUpBody();
-
-   Real dt = Abs((atTime - lastEphemTimeGT).GetTimeInSec());
-   if (dt < ephemUpdateInterval)
-   {
-      for (Integer i = 0; i < 3; i++) outAcceleration[i] = prevAcceleration[i];
-   }
-
-   switch (posVelSrc)
-   {
-   case Gmat::DE405:
-   {
-      if (!theSourceFile)
-      {
-         throw PlanetaryEphemException(
-            "DE 405 file requested, but no file specified");
-      }
-
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage
-      ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVelAccel(%d, %f, %s)\n",
-         this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, GmatTime(atTime).GetMjd(),
-         overrideTime ? "true" : "false");
-#endif
-
-      Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      for (Integer i = 0; i < 3; ++i) outAcceleration[i] = posVelAccel[i + 6];
-
-      break;
-   }
-   case Gmat::DE421:
-   {
-      if (!theSourceFile)
-      {
-         throw PlanetaryEphemException(
-            "DE 421 file requested, but no file specified");
-      }
-
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage
-      ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-         this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, GmatTime(atTime).GetMjd(),
-         overrideTime ? "true" : "false");
-#endif
-
-      Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      for (Integer i = 0; i < 3; ++i) outAcceleration[i] = posVelAccel[i + 6];
-
-      break;
-   }
-   case Gmat::DE424:
-   {
-      if (!theSourceFile)
-      {
-         throw PlanetaryEphemException(
-            "DE 424 file requested, but no file specified");
-      }
-
-#ifdef DEBUG_GET_STATE
-      MessageInterface::ShowMessage
-      ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-         this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, GmatTime(atTime).GetMjd(),
-         overrideTime ? "true" : "false");
-#endif
-
-      Real* posVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      for (Integer i = 0; i < 3; ++i) outAcceleration[i] = posVelAccel[i + 6];
-
-      break;
-   }
-      //      case Gmat::DE430 :
-      //          if (!theSourceFile)
-      //          {
-      //             throw PlanetaryEphemException(
-      //                   "DE 430 file requested, but no file specified");
-      //          }
-      //          #ifdef DEBUG_GET_STATE
-      //          MessageInterface::ShowMessage
-      //             ("   In <%p> '%s', Calling theSourceFile(%s)->GetPosVel(%d, %f, %s)\n",
-      //              this, GetName().c_str(), (theSourceFile->GetName()).c_str(), bodyNumber, atTime.GetReal(),
-      //              overrideTime ? "true" : "false");
-      //          #endif
-      //          outState     = theSourceFile->GetPosVel(bodyNumber,atTime, overrideTime);
-      //          break;
-      //
-   case Gmat::SPICE:
-   {
-#ifdef __USE_SPICE__
-      if (!spiceSetupDone) SetUpSPICE();
-
-      // SPICE has no function used to calculate acceleration. Therefore, we set it to zero vector and make a warning about incorrect acceleration.
-      //Rvector3 spiceAcceleration = kernelReader->GetTargetAcceleration(naifName, naifId, atTime, j2000BodyName, naifIdObserver);
-      Rvector3 spiceAcceleration(0.0, 0.0, 0.0);
-      for (Integer i = 0; i < 3; i++) outAcceleration[i] = spiceAcceleration[i];
-
-#ifdef DEBUG_CB_SPICE_VS_DE
-      Real* dePosVelAccel = theSourceFile->GetPosVel(bodyNumber, atTime, overrideTime);
-      MessageInterface::ShowMessage("for body %s, for time: %12.10f:\n", instanceName.c_str(), GmatTime(atTime).GetMjd());
-      MessageInterface::ShowMessage("     SPICE state is: %12.10f  %12.10f  %12.10f\n",
-         spiceAcceleration[0], spiceAcceleration[1], spiceAcceleration[2]);
-      MessageInterface::ShowMessage("     DE acceleration is:    %12.10f  %12.10f  %12.10f\n",
-         dePosVelAccel[6], dePosVelAccel[7], dePosVelAccel[8]);
-#endif
-#endif
-
-      break;
-   }
-   default:
-      throw SolarSystemException("Invalid data source defined for body "
-         + instanceName);
-      break;
-   }
-
-   stateTimeGT = atTime;
-   lastEphemTimeGT = atTime;
-   stateTime = GmatTime(atTime).GetMjd();
-   lastEphemTime = GmatTime(atTime).GetMjd();
-
-   acceleration.Set(outAcceleration[0], outAcceleration[1], outAcceleration[2]);
-   lastAcceleration.Set(outAcceleration[0], outAcceleration[1], outAcceleration[2]);
-
-   for (Integer i = 0; i < 3; i++)
-      prevAcceleration[i] = outAcceleration[i];
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage("Exiting GetAcceleration -------------\n");
 #endif
 }
 
@@ -3918,96 +3390,6 @@ const Rvector3 CelestialBody::GetMJ2000Velocity(const A1Mjd &atTime)
 }
 
 
-
-//------------------------------------------------------------------------------
-// const Rvector3 GetMJ2000Acceleration(const A1Mjd &atTime)
-//------------------------------------------------------------------------------
-/*
- * Returns acceleration of the body in j2kbody MJ2000Eq coordinate system
- *
- * @param  <atTime>   time at which acceleration is requested
- *
- * @result MJ2000eq acceleration for the body at the requested time
- *
- */
- //------------------------------------------------------------------------------
-const Rvector3 CelestialBody::GetMJ2000Acceleration(const A1Mjd &atTime)
-{
-#ifdef DEBUG_CB_GET_MJ2000_STATE
-   MessageInterface::ShowMessage("In GetMJ2000State, body is %s, time is %12.10f\n",
-      instanceName.c_str(), atTime.Get());
-   MessageInterface::ShowMessage("In GetMJ2000Acceleration, j2000Body is %s\n",
-      (j2000Body->GetName()).c_str());
-#endif
-   if (j2000Body == NULL)
-      throw SolarSystemException
-      ("CelestialBody::GetMJ2000Acceleration() j2000Body is NULL for " + instanceName);
-
-   // If j2000Body is this body, return the zero state vector
-   if (j2000Body->GetName() == instanceName)
-   {
-      acceleration.Set(0.0, 0.0, 0.0);
-      stateTime = atTime;
-      lastEphemTime = atTime;
-      lastAcceleration = acceleration;
-      return acceleration;
-   }
-
-   Rvector3         accelerationEphem = GetAcceleration(atTime);
-   Rvector3         j2kEphemAcceleration;
-   UnsignedInt ot = j2000Body->GetType();
-   if (ot == Gmat::CELESTIAL_BODY)
-   {
-      j2kEphemAcceleration = ((CelestialBody*)j2000Body)->GetAcceleration(atTime);
-   }
-   else if (ot == Gmat::CALCULATED_POINT)
-   {
-      // @todo fill in with calculated point stuff when it's done
-      //j2kEphemAcceleration = ((CalculatedPoint*)j2000Body)->GetAcceleration(atTime);
-   }
-   else
-   {
-      throw SolarSystemException("j2000Body is of incorrect type.");
-   }
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage
-   ("CelestialBody::GetMJ2000Acceleartion() accelerationEphem =\n   %s\n",
-      accelerationEphem.ToString().c_str());
-   MessageInterface::ShowMessage
-   ("CelestialBody::GetMJ2000Acceleration() j2kEphemAcceleration =\n   %s\n",
-      j2kEphemAcceleration.ToString().c_str());
-#endif
-#ifdef DEBUG_CB_GET_MJ2000_STATE
-   Rvector3 theAcceleration = accelerationEphem - j2kEphemAcceleration;
-   Real ttTime = theTimeConverter->Convert(atTime.Get(), TimeSystemConverter::A1MJD,
-      TimeSystemConverter::TTMJD, GmatTimeConstants::JD_JAN_5_1941);
-   Real tdbTime = theTimeConverter->Convert(atTime.Get(), TimeSystemConverter::A1MJD,
-      TimeSystemConverter::TDBMJD, GmatTimeConstants::JD_JAN_5_1941);
-   MessageInterface::ShowMessage(
-      "Body: %s   TT(TDB) Time: %12.10f (%12.10f)   acceleration:  %12.10f  %12.10f  %12.10f\n",
-      instanceName.c_str(), ttTime, tdbTime,
-      theAcceleration[0], theAcceleration[1], theAcceleration[2]);
-#endif
-
-   // we need to store the last computed j2k state
-   // the lastEphemTime will have been set when we called GetAcceleration
-
-   // SPICE does the subtraction itself
-   if (posVelSrc == Gmat::SPICE)
-   {
-      j2kAcceleration = accelerationEphem;
-      //      return stateEphem;
-   }
-   else // DE or TwoBodyPropagation
-   {
-      j2kAcceleration = accelerationEphem - j2kEphemAcceleration;
-      //      return (stateEphem - j2kEphemState);
-   }
-   return j2kAcceleration;
-}
-
-
 //------------------------------------------------------------------------------
 // const Rvector6 GetMJ2000State(const GmatTime &atTime)
 //------------------------------------------------------------------------------
@@ -4135,99 +3517,6 @@ const Rvector3 CelestialBody::GetMJ2000Velocity(const GmatTime &atTime)
    Rvector6 tmp = GetMJ2000State(atTime);
    return (tmp.GetV());
 }
-
-
-
-//------------------------------------------------------------------------------
-// const Rvector3 GetMJ2000Acceleration(const GmatTime &atTime)
-//------------------------------------------------------------------------------
-/*
-* Returns the MJ2000Eq acceleration for the body.
-*
-* @param  <atTime>   time at which state is requested
-*
-* @result MJ2000eq acceleration for the body at the requested time
-*
-*/
-//------------------------------------------------------------------------------
-const Rvector3 CelestialBody::GetMJ2000Acceleration(const GmatTime &atTime)
-{
-#ifdef DEBUG_CB_GET_MJ2000_STATE
-   MessageInterface::ShowMessage("In GetMJ2000Acceleration, body is %s, time is %12.10f\n",
-      instanceName.c_str(), GmatTime(atTime).GetMjd());
-   MessageInterface::ShowMessage("In GetMJ2000Acceleration, j2000Body is %s\n",
-      (j2000Body->GetName()).c_str());
-#endif
-   if (j2000Body == NULL)
-      throw SolarSystemException
-      ("CelestialBody::GetMJ2000Acceleration() j2000Body is NULL for " + instanceName);
-
-   // If j2000Body is this body, return the zero acceleration vector
-   if (j2000Body->GetName() == instanceName)
-   {
-      acceleration.Set(0.0, 0.0, 0.0);
-      stateTimeGT = atTime;
-      stateTime = GmatTime(atTime).GetMjd();
-      lastEphemTimeGT = atTime;
-      lastEphemTime = GmatTime(atTime).GetMjd();
-      lastAcceleration = acceleration;
-      return acceleration;
-   }
-
-   Rvector3         accelerationEphem = GetAcceleration(atTime);
-   Rvector3         j2kEphemAcceleration;
-   UnsignedInt      ot = j2000Body->GetType();
-   if (ot == Gmat::CELESTIAL_BODY)
-   {
-      j2kEphemAcceleration = ((CelestialBody*)j2000Body)->GetAcceleration(atTime);
-   }
-   else if (ot == Gmat::CALCULATED_POINT)
-   {
-      // @todo fill in with calculated point stuff when it's done
-      //j2kEphemAcceleration = ((CalculatedPoint*)j2000Body)->GetAcceleration(atTime);
-   }
-   else
-   {
-      throw SolarSystemException("j2000Body is of incorrect type.");
-   }
-
-#ifdef DEBUG_GET_STATE
-   MessageInterface::ShowMessage
-   ("CelestialBody::GetMJ2000Acceleration() accelerationEphem =\n   %s\n",
-      accelerationEphem.ToString().c_str());
-   MessageInterface::ShowMessage
-   ("CelestialBody::GetMJ2000Acceleration() j2kEphemAcceleration =\n   %s\n",
-      j2kEphemAcceleration.ToString().c_str());
-#endif
-#ifdef DEBUG_CB_GET_MJ2000_STATE
-   Rvector3 theAcceleration = accelerationEphem - j2kEphemAcceleration;
-   GmatTime ttTime = theTimeConverter->Convert(atTime, TimeSystemConverter::A1MJD,
-      TimeSystemConverter::TTMJD, GmatTimeConstants::JD_JAN_5_1941);
-   GmatTime tdbTime = theTimeConverter->Convert(atTime, TimeSystemConverter::A1MJD,
-      TimeSystemConverter::TDBMJD, GmatTimeConstants::JD_JAN_5_1941);
-   MessageInterface::ShowMessage(
-      "Body: %s   TT(TDB) Time: %12.10f (%12.10f)   acceleration:  %12.10f  %12.10f  %12.10f\n",
-      instanceName.c_str(), ttTime.GetMjd(), tdbTime.GetMjd(),
-      theAcceleration[0], theAcceleration[1], theAcceleration[2]);
-#endif
-
-   // we need to store the last computed j2k acceleration
-   // the lastEphemTime will have been set when we called GetAcceleration
-
-   // SPICE does the subtraction itself
-   if (posVelSrc == Gmat::SPICE)
-   {
-      j2kAcceleration = accelerationEphem;
-      //      return accelerationEphem;
-   }
-   else // DE or TwoBodyPropagation
-   {
-      j2kAcceleration = accelerationEphem - j2kEphemAcceleration;
-      //      return (stateEphem - j2kEphemState);
-   }
-   return j2kAcceleration;
-}
-
 
 
 //------------------------------------------------------------------------------

@@ -157,10 +157,6 @@ protected:
          Velocity[0] = 0.0;
          Velocity[1] = 0.0;
          Velocity[2] = 0.0;
-
-         Acceleration[0] = 0.0;
-         Acceleration[1] = 0.0;
-         Acceleration[2] = 0.0;
       }
       /// copy constructor
       stateData(const stateData& sd)
@@ -171,10 +167,6 @@ protected:
          Velocity[0] = sd.Velocity[0];
          Velocity[1] = sd.Velocity[1];
          Velocity[2] = sd.Velocity[2];
-
-         Acceleration[0] = sd.Acceleration[0];
-         Acceleration[1] = sd.Acceleration[1];
-         Acceleration[2] = sd.Acceleration[2];
       }
       /// operator=
       stateData& operator=(const stateData& sd)
@@ -186,15 +178,11 @@ protected:
          Velocity[1] = sd.Velocity[1];
          Velocity[2] = sd.Velocity[2];
 
-         Acceleration[0] = sd.Acceleration[0];
-         Acceleration[1] = sd.Acceleration[1];
-         Acceleration[2] = sd.Acceleration[2];
          return *this;
       }
       /// data
       double Position[3];
       double Velocity[3];
-      double Acceleration[3];
    };
 
    typedef struct stateData stateType;

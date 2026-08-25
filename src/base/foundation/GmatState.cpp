@@ -65,9 +65,6 @@ GmatState::GmatState(Integer size) :
    {
       theData = NULL;
 
-      // Adding first derivative of state w.r.t. time t 
-      theDataDot = NULL;
-
       dataIDs = NULL;
       associatedElements = NULL;
 
@@ -75,7 +72,6 @@ GmatState::GmatState(Integer size) :
    else
    {
       theData = new Real[stateSize];
-      theDataDot = new Real[stateSize];
 
       Zero();
       dataIDs = new Integer[stateSize];
@@ -95,9 +91,6 @@ GmatState::~GmatState()
 {
    if (theData != NULL)
       delete [] theData;
-
-   if (theDataDot != NULL)
-      delete[] theDataDot;
 
    if (dataIDs != NULL)
       delete [] dataIDs;
@@ -125,19 +118,16 @@ GmatState::GmatState(const GmatState& gs) :
    if (stateSize == 0)
    {
       theData = NULL;
-      theDataDot = NULL;
       dataIDs = NULL;
       associatedElements = NULL;
    }
    else
    {
       theData = new Real[stateSize];
-      theDataDot = new Real[stateSize];
       dataIDs = new Integer[stateSize];
       associatedElements = new Integer[stateSize];
       
       memcpy(theData, gs.theData, stateSize * sizeof(Real));
-      memcpy(theDataDot, gs.theDataDot, stateSize * sizeof(Real));
       memcpy(dataIDs, gs.dataIDs, stateSize * sizeof(Integer));
       memcpy(associatedElements, gs.associatedElements, stateSize * sizeof(Integer));
       
@@ -167,8 +157,6 @@ GmatState& GmatState::operator=(const GmatState& gs)
       
       if (theData != NULL)
          delete [] theData;
-      if (theDataDot != NULL)
-         delete[] theDataDot;
       if (dataIDs != NULL)
          delete [] dataIDs;
       if (associatedElements != NULL)
@@ -179,18 +167,15 @@ GmatState& GmatState::operator=(const GmatState& gs)
       if (stateSize == 0)
       {
          theData = NULL;
-         theDataDot = NULL;
          dataIDs = NULL;
          associatedElements = NULL;
       }
       else
       {
          theData = new Real[stateSize];
-         theDataDot = new Real[stateSize];
          dataIDs = new Integer[stateSize];
          associatedElements = new Integer[stateSize];
          memcpy(theData, gs.theData, stateSize * sizeof(Real));
-         memcpy(theDataDot, gs.theDataDot, stateSize * sizeof(Real));
          memcpy(dataIDs, gs.dataIDs, stateSize * sizeof(Integer));
          memcpy(associatedElements, gs.associatedElements, stateSize * sizeof(Integer));
          
@@ -314,41 +299,6 @@ bool GmatState::SetState(const Real *data, const Integer size,
 
 
 //------------------------------------------------------------------------------
-// Real* GetStateDot()
-//------------------------------------------------------------------------------
-/**
- */
- //------------------------------------------------------------------------------
-Real* GmatState::GetStateDot()
-{
-   return theDataDot;
-}
-
-
-//------------------------------------------------------------------------------
-// bool SetStateDot(const Real *dataDot, const Integer size, const Integer start)
-
-//------------------------------------------------------------------------------
-/**
- */
- //------------------------------------------------------------------------------
-bool GmatState::SetStateDot(const Real *dataDot, const Integer size,
-   const Integer start)
-{
-   if (start < 0)
-      throw GmatBaseException(
-         "Cannot set derivative w.r.t. time of state data -- starting index is out of range");
-   if (start + size > stateSize)
-      throw GmatBaseException(
-         "Cannot set derivative w.r.t. time of state data -- data span is out of range");
-
-   memcpy(&(theDataDot[start]), dataDot, size * sizeof(Real));
-
-   return true;
-}
-
-
-//------------------------------------------------------------------------------
 // GmatEpoch GetEpoch() const
 //------------------------------------------------------------------------------
 /**
@@ -448,7 +398,6 @@ void GmatState::Resize(Integer newSize, bool withCopy)
       throw GmatBaseException("GmatState Resize requested an invalid size");
    
    Real *newData = new Real[newSize];
-   Real *newDataDot = new Real[newSize];
    Integer *newIDs = new Integer[newSize];
    Integer *newAssociates = new Integer[newSize];
    StringArray newTypes;
@@ -461,7 +410,6 @@ void GmatState::Resize(Integer newSize, bool withCopy)
       // copy as much of the current state as possible into the new state 
       Integer size = (newSize > stateSize ? stateSize : newSize);
       memcpy(newData, theData, size*sizeof(Real));
-      memcpy(newDataDot, theDataDot, size * sizeof(Real));
       memcpy(newIDs, dataIDs, size*sizeof(Integer));
       memcpy(newAssociates, associatedElements, size*sizeof(Integer));
   
@@ -473,11 +421,9 @@ void GmatState::Resize(Integer newSize, bool withCopy)
    
    stateSize = newSize;
    delete [] theData;
-   delete[] theDataDot;
    delete [] dataIDs;
    delete [] associatedElements;
    theData = newData;
-   theDataDot = newDataDot;
    dataIDs = newIDs;
    associatedElements = newAssociates;
    dataTypes.assign(newSize, "");
@@ -536,6 +482,5 @@ void GmatState::Zero(Integer begin, UnsignedInt length)
    for (Integer i = begin; i < (Integer)(begin + length); ++i)
    {
       theData[i]    = 0.0;
-      theDataDot[i] = 0.0;
    }
 }

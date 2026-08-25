@@ -695,6 +695,8 @@ private:
 
    std::stringstream formatter;
 
+   static bool WSAStartupCalled;
+
 };
 
 #endif /* Estimator_hpp */

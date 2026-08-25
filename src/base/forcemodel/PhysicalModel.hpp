@@ -156,12 +156,9 @@ public:
    virtual std::string    GetBodyName();
    virtual Integer        GetDimension();
    virtual Real *         GetState();
-   virtual Real *         GetStateDot(); 
 
    virtual Real*          GetJ2KState();
    const Real *           GetDerivativeArray();
-
-   const Real*            GetJ2KDerivativeArray();
 
    virtual bool SetBody(const std::string& theBody);
    virtual void SetBodyName(const std::string& theBody);
@@ -365,13 +362,9 @@ protected:
    GmatState *theState;
    /// Array of data parameters containing the model data
    Real *modelState;
-   /// Array of data parameters containing derivative w.r.t. time of the model data 
-   Real *modelStateDot;
    
    /// The state vector in J2000BodyMJ2000Eq coordinates.
    Real *rawState;
-   /// Derivative w.r.t. time of the state vector in J2000BodyMJ2000Eq coordinates. 
-   Real *rawStateDot;
 
    /// The base epoch
    Real epoch;
@@ -386,8 +379,6 @@ protected:
 
    /// Array containing the most recent derivative calculation, when needed (in force model coordinate system)
    Real * deriv;
-   /// Array containing the most recent derivative calculation, when needed (in j2kbody MJ2000 coordinate system)
-   Real * rawDeriv;
 
    /// Mass Jacobian vector (a single column for the Jacobian data)
    Real * massJacobian;
@@ -482,8 +473,6 @@ protected:
 private:
    // Change fro prublic to private
    void SetState(const Real * st); 
-   void SetStateDot(const Real * stDot); 
-
 };
 
 #endif // PhysicalModel_hpp

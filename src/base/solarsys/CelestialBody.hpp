@@ -188,13 +188,6 @@ public:
    virtual const Rvector6&      GetState(GmatTime atTime);
    virtual void                 GetState(const GmatTime&atTime, Real *outState);
    
-   virtual const Rvector3&      GetAcceleration(A1Mjd atTime);
-   virtual const Rvector3&      GetAcceleration(Real atTime);
-   virtual void                 GetAcceleration(const A1Mjd &atTime, Real *outAcceleration);
-
-   virtual const Rvector3&      GetAcceleration(GmatTime atTime);
-   virtual void                 GetAcceleration(const GmatTime &atTime, Real *outAcceleration);
-
    virtual const Rvector3       GetPositionDelta(const GmatTime &atTime1, const GmatTime &atTime2);
    virtual const Rvector3       GetPositionDeltaSSB(const GmatTime &atTime1, const GmatTime &atTime2);
 
@@ -283,17 +276,14 @@ public:
    virtual const Rvector6 GetMJ2000State(const A1Mjd &atTime);
    virtual const Rvector3 GetMJ2000Position(const A1Mjd &atTime);
    virtual const Rvector3 GetMJ2000Velocity(const A1Mjd &atTime);
-   virtual const Rvector3 GetMJ2000Acceleration(const A1Mjd &atTime);
 
    virtual const Rvector6 GetMJ2000State(const Real atTime) { return GetMJ2000State(A1Mjd(atTime)); };
    virtual const Rvector3 GetMJ2000Position(const Real atTime) { return GetMJ2000Position(A1Mjd(atTime)); };
    virtual const Rvector3 GetMJ2000Velocity(const Real atTime) { return GetMJ2000Velocity(A1Mjd(atTime)); };
-   virtual const Rvector3 GetMJ2000Acceleration(const Real atTime) { return GetMJ2000Acceleration(A1Mjd(atTime)); };
 
    virtual const Rvector6 GetMJ2000State(const GmatTime &atTime);
    virtual const Rvector3 GetMJ2000Position(const GmatTime &atTime);
    virtual const Rvector3 GetMJ2000Velocity(const GmatTime &atTime);
-   virtual const Rvector3 GetMJ2000Acceleration(const GmatTime &atTime);
 
    // Inputs to SetOrientationParameters are in the order:
    // SpinAxisRAConstant
@@ -479,7 +469,6 @@ protected:
    Gmat::PosVelSource       posVelSrc;
    /// state of the body 0-2 position 3-5 velocity
    Rvector6                 state;
-   Rvector3                 acceleration;
    // time of the state
    A1Mjd                    stateTime;
    GmatTime                 stateTimeGT;
@@ -584,14 +573,11 @@ protected:
 
    /// last state value calculated
    Rvector6               lastState;
-   Rvector3               lastAcceleration;
 
    /// last MJ2000 state calculated
    Rvector6               j2kState;
-   Rvector3               j2kAcceleration;
 
    Real                   prevState[6];
-   Real                   prevAcceleration[3];
    
    /// lists of valid models
    StringArray            models[Gmat::ModelTypeCount];

@@ -153,9 +153,10 @@ protected:
 
    virtual bool            ParseFile() = 0;
 
+   // Read line from ephFile
+   bool ReadLine(std::string &line);
 
 private:
-   void ReadLine(std::ifstream& ephFile, std::string&line);
    std::string LeftTrim(std::string str);
 };
 

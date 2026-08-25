@@ -4232,8 +4232,6 @@ void Propagate::PrepareToPropagate()
          }
       }
    }
-   // Step to calculate force apply to spacecrafts at initial epoch
-   CalculateStateDotAtInitialEpoch();
 
 
    // It needs to register to publish data right before the first publishing data 

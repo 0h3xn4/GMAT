@@ -1605,51 +1605,6 @@ bool Simulator::Initialize()
       }
    }
    
-   // comment this out for now for testing with RSSStep
-   std::string propSettingError;
-   for (UnsignedInt i = 0; i < propagators.size(); ++i)
-   {
-      ODEModel *ode = propagators[i]->GetODEModel();
-      if (ode)
-      {
-         if (ode->GetStringParameter("ErrorControl") != "None")
-         {
-            propSettingError += "GMAT navigation requires use of fixed "
-               "stepped propagation. The ErrorControl parameter specified for "
-               "the ForceModel resource associated with the propagator, ";
-            propSettingError += propagatorNames[i];
-            propSettingError += ", used  with the ";
-            propSettingError += typeName;
-            propSettingError += " named ";
-            propSettingError += instanceName;
-            propSettingError += " must be 'None.' Of course, when using fixed step "
-                  "control, the user must choose a step size, as given by the "
-                  "Propagator InitialStepSize field, for the chosen orbit regime "
-                  "and force profile, that yields the desired accuracy.\n";
-         }
-
-         // Ensure only one harmonic gravity model except in testing mode
-         if (!GmatGlobal::Instance()->InTestingMode())
-         {
-            if (ode->GetForce("GravityField", 1) != NULL)
-            {
-               propSettingError += "GMAT navigation requires use of at most "
-                  "one spherical harmonic gravity model in numerical "
-                  "propagation. The \"PrimaryBodies\" parameter specified for "
-                  "the ForceModel resource associated with the propagator, ";
-               propSettingError += propagatorNames[i];
-               propSettingError += ", used  with the ";
-               propSettingError += typeName;
-               propSettingError += " named ";
-               propSettingError += instanceName;
-               propSettingError += " contains too many entries.\n";
-            }
-         }
-      }
-   }
-   if (propSettingError != "")
-      throw EstimatorException(propSettingError);
-   
    // Check the names of measurement models shown in sim.AddData have to be the names of created objects
    std::vector<TrackingFileSet*> tfs = measManager.GetAllTrackingFileSets();
    StringArray measNames = measManager.GetMeasurementNames();
