@@ -548,7 +548,7 @@ PhaseCheckIntervalDays     = 90;     % days between reconfiguration checks --
 NextPhaseCheckDay          = 90;     % first check/retarget at day 90
 
 Create Variable CurrentTargetDistanceKm PhiCurrentDeg PhiSign PhiTargetDeg;
-Create Variable RelativeDistanceKm DistanceErrorKm ToleranceKm DeltaA PhaseTargetSMA;
+Create Variable RelativeDistanceKm DistanceErrorKm AbsDistanceErrorKm ToleranceKm DeltaA PhaseTargetSMA;
 
 Create Variable BurnDurationSSO1 BurnDurationSSO2 BurnDurationMid3;
 BurnDurationSSO1 = 82000;           % sec, initial guess (~1 day @ 10 mN/300 kg)
@@ -729,8 +729,9 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
       RelativeDistanceKm = abs(PhiCurrentDeg) * KmPerDegree;
       DistanceErrorKm    = RelativeDistanceKm - CurrentTargetDistanceKm;
       ToleranceKm        = DistanceToleranceFraction * CurrentTargetDistanceKm;
+      AbsDistanceErrorKm = abs(DistanceErrorKm);
 
-      If abs(DistanceErrorKm) > ToleranceKm
+      If AbsDistanceErrorKm > ToleranceKm
 
          % Preserve which satellite is ahead (PhiSign); only the magnitude
          % of the separation is retargeted, so no side-swap maneuver is

@@ -415,7 +415,7 @@ NextPhaseCheckDay          = 3;      % the FIRST check is pulled forward to
                                       % demo's reconfiguration maneuver.
 
 Create Variable CurrentTargetDistanceKm PhiCurrentDeg PhiSign PhiTargetDeg;
-Create Variable RelativeDistanceKm DistanceErrorKm ToleranceKm DeltaA PhaseTargetSMA;
+Create Variable RelativeDistanceKm DistanceErrorKm AbsDistanceErrorKm ToleranceKm DeltaA PhaseTargetSMA;
 
 Create Variable BurnDurationSSO1 BurnDurationSSO2 BurnDurationMid3;
 BurnDurationSSO1 = 37000;           % sec, initial guess -- retuned for the
@@ -606,8 +606,9 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
       RelativeDistanceKm = abs(PhiCurrentDeg) * KmPerDegree;
       DistanceErrorKm    = RelativeDistanceKm - CurrentTargetDistanceKm;
       ToleranceKm        = DistanceToleranceFraction * CurrentTargetDistanceKm;
+      AbsDistanceErrorKm = abs(DistanceErrorKm);
 
-      If abs(DistanceErrorKm) > ToleranceKm
+      If AbsDistanceErrorKm > ToleranceKm
 
          DemoMsg = sprintf('Day %.0f: formation check -- SSO-1/SSO-2 separation is %.1f km; new target is %.0f km (+/- %.0f km tolerance). Initiating autonomous reconfiguration.', SSO_Sat1.ElapsedDays, RelativeDistanceKm, CurrentTargetDistanceKm, ToleranceKm);
          Write DemoMsg { Style = Concise, MessageWindow = true };
