@@ -93,8 +93,25 @@
 %      re-propagates the full constellation through a multi-hour-to-~1-day
 %      thrust arc. This script is correspondingly much slower to run than
 %      an impulsive-burn version -- expect a long run for the full 5-year,
-%      3-spacecraft case. Consider running headless (no GUI plots) for the
-%      full-duration production run.
+%      3-spacecraft case.
+%    - Performance tuning: the dominant cause of a run getting progressively
+%      slower/laggier over time is the live 3-D view (Constellation3D) and
+%      XYPlot (AltitudeHistory) accumulating an ever-growing trajectory/point
+%      history that GMAT has to redraw every update -- not the propagation
+%      itself. Two mitigations are applied here, both tunable:
+%        (1) StepSizeDays = 3 (below) instead of 1, cutting the number of
+%            Propagate/Report/redraw events ~3x while still comfortably
+%            resolving the 5 km altitude deadband.
+%        (2) GravityField.Earth.Degree/Order = 10 (below) instead of 20,
+%            since J2-J4-dominated secular effects (what this mission design
+%            actually depends on) don't need 20x20 fidelity, and harmonic
+%            synthesis cost grows with degree.
+%      For a long, unattended production run, the single biggest additional
+%      speedup is to turn the live plots off entirely -- set
+%      Constellation3D.ShowPlot = false and AltitudeHistory.ShowPlot = false
+%      below -- and rely on the four ReportFile outputs (which are unaffected
+%      and far cheaper to write than a live render). Re-enable both for a
+%      short validation run when you want to see the visualization.
 %    - GMAT does not allow more than one Spacecraft in a single Propagator
 %      clause while a FiniteBurn is active on any of them ("Multiple
 %      Spacecraft are not allowed in a propagator driving a finite burn").
@@ -102,7 +119,7 @@
 %      pair therefore uses the "Synchronized Prop(Sat1) Prop(Sat2) Prop(Sat3)"
 %      form (one Propagator clause per spacecraft, time-synchronized) instead
 %      of the simpler "Prop(Sat1, Sat2, Sat3)" form. The pure-coast
-%      propagations (DailyStep, PhaseDrift), where no burn is active, keep
+%      propagations (MonitoringStep, PhaseDrift), where no burn is active, keep
 %      the simpler multi-spacecraft-per-Propagator form.
 %  ===========================================================================
 %----------------------------------------------------------------------------
@@ -193,8 +210,8 @@ Create ForceModel HighFidelityFM;
 HighFidelityFM.CentralBody                 = Earth;
 HighFidelityFM.PrimaryBodies               = {Earth};
 HighFidelityFM.PointMasses                 = {Sun, Luna};
-HighFidelityFM.GravityField.Earth.Degree   = 20;
-HighFidelityFM.GravityField.Earth.Order    = 20;
+HighFidelityFM.GravityField.Earth.Degree   = 10;
+HighFidelityFM.GravityField.Earth.Order    = 10;
 HighFidelityFM.GravityField.Earth.PotentialFile = 'EGM96.cof';
 HighFidelityFM.GravityField.Earth.TideModel = 'None';
 HighFidelityFM.Drag.AtmosphereModel        = JacchiaRoberts;
@@ -379,7 +396,13 @@ DCPhase.DerivativeMethod     = ForwardDifference;
 
 Create Variable MissionDurationDays StepSizeDays;
 MissionDurationDays = 1826.25;      % 5 Julian years
-StepSizeDays         = 1;           % daily altitude-monitoring cadence
+StepSizeDays         = 3;           % altitude-monitoring cadence (days) --
+                                     % larger = fewer Propagate/Report/redraw
+                                     % events and a faster run, at the cost of
+                                     % coarser altitude-deadband resolution.
+                                     % 3 days is small relative to the 5 km
+                                     % deadband's multi-week fill time; drop
+                                     % back to 1 if you tighten the deadband.
 
 Create Variable NominalSMA AltLowerBoundAlt;
 NominalSMA        = 6948.137;       % km, 570 km altitude circular SMA
@@ -478,8 +501,8 @@ Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Ea
 
 While SSO_Sat1.ElapsedDays < MissionDurationDays
 
-   % ---- Synchronized daily propagation of the whole constellation ----
-   Propagate 'DailyStep' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = StepSizeDays};
+   % ---- Synchronized periodic propagation of the whole constellation ----
+   Propagate 'MonitoringStep' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = StepSizeDays};
 
    % ---- Orbit history logging ----
    Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude SSO_Sat1.ElectricTank_SSO1.FuelMass;
