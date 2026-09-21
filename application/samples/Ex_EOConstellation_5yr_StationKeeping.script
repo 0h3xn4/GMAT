@@ -1,0 +1,415 @@
+%----------------------------------------------------------------------------
+%  Ex_EOConstellation_5yr_StationKeeping
+%
+%  Mission analysis script for a 3-satellite Earth-observation constellation:
+%    - SSO_Sat1, SSO_Sat2 : co-planar Sun-synchronous orbit (SSO)
+%    - MidInc_Sat3        : mid-inclination (53 deg) orbit
+%  All three satellites fly at a nominal altitude of 570 km.
+%
+%  Scope: 5-year (1826.25-day) high-fidelity propagation with a full real-
+%  world perturbation model, plus automated:
+%    (1) altitude / SMA station-keeping (drag makeup) for each spacecraft
+%    (2) in-plane phasing ("constellation-keeping") between SSO_Sat1 and
+%        SSO_Sat2 using a drift-orbit (differential-SMA) maneuver pair
+%
+%  ============================ KEY ASSUMPTIONS ============================
+%  These are mission-design placeholders. Replace with project values as
+%  they firm up (bus properties, launch epoch, coverage-driven RAAN, etc.):
+%    - Epoch (all 3 sats)   : 01 Jan 2027 00:00:00.000 UTC (assumed common
+%                              deployment epoch; adjust to actual launch date)
+%    - Spacecraft bus       : DryMass 300 kg, Cd 2.2, Cr 1.8,
+%                              DragArea 2.2 m^2, SRPArea 2.6 m^2 (all 3 sats
+%                              assumed to share a common bus per procurement)
+%    - Propulsion            : monopropellant-class impulsive burns,
+%                              Isp = 220 s (swap for EP Isp if applicable)
+%    - SSO inclination       : 97.6704 deg, solved from
+%                              dRAAN/dt = -1.5*n*J2*(Re/a)^2*cos(i) set equal
+%                              to the mean solar rate (360/365.2421897 deg/day)
+%                              at a = Re + 570 km
+%    - SSO eccentricity/AOP  : e = 0.0011, AOP = 90 deg -> approximates the
+%                              classical "frozen orbit" condition
+%                              e_frozen = -(J3/2J2)*(Re/a)*sin(i), which
+%                              keeps the perigee argument (and mean altitude
+%                              per latitude) from secular drift
+%    - SSO RAAN              : 78.73 deg, chosen (via a low-precision solar
+%                              ephemeris at the epoch above) to give an
+%                              LTDN (descending-node local time) of
+%                              approximately 10:30, a typical EO choice.
+%                              Re-solve precisely in GMAT (Sun RA report) or
+%                              with a dedicated LTAN targeter once the actual
+%                              launch epoch is fixed.
+%    - SSO in-plane phasing  : Sat1/Sat2 separated by 180 deg in true
+%                              anomaly (opposite sides of the shared plane)
+%                              for even ground-track distribution. Adjust to
+%                              the mission's actual revisit/coverage design.
+%    - Mid-inclination plane : RAAN = 0 deg, TA = 0 deg are placeholders --
+%                              select based on the target coverage band /
+%                              longitude of interest.
+%    - No inclination-control burns are budgeted: at 570 km, drag and SRP do
+%      not drive meaningful secular inclination drift over 5 years, so only
+%      in-plane (SMA/altitude) control is modeled. RAAN/LTAN stability for
+%      the SSO pair is a direct consequence of holding altitude (and hence
+%      the J2 nodal precession rate) inside its deadband; it is not
+%      separately targeted here.
+%  ===========================================================================
+%----------------------------------------------------------------------------
+
+
+%----------------------------------------
+%---------- Spacecraft
+%----------------------------------------
+
+Create Spacecraft SSO_Sat1;
+SSO_Sat1.DateFormat           = UTCGregorian;
+SSO_Sat1.Epoch                = '01 Jan 2027 00:00:00.000';
+SSO_Sat1.CoordinateSystem     = EarthMJ2000Eq;
+SSO_Sat1.DisplayStateType     = Keplerian;
+SSO_Sat1.SMA                  = 6948.137;
+SSO_Sat1.ECC                  = 0.0011;
+SSO_Sat1.INC                  = 97.6704;
+SSO_Sat1.RAAN                 = 78.73;
+SSO_Sat1.AOP                  = 90;
+SSO_Sat1.TA                   = 0;
+SSO_Sat1.DryMass              = 300;
+SSO_Sat1.Cd                   = 2.2;
+SSO_Sat1.Cr                   = 1.8;
+SSO_Sat1.DragArea             = 2.2;
+SSO_Sat1.SRPArea              = 2.6;
+SSO_Sat1.Id                   = 'SSO-1';
+SSO_Sat1.OrbitColor           = Red;
+
+Create Spacecraft SSO_Sat2;
+SSO_Sat2.DateFormat           = UTCGregorian;
+SSO_Sat2.Epoch                = '01 Jan 2027 00:00:00.000';
+SSO_Sat2.CoordinateSystem     = EarthMJ2000Eq;
+SSO_Sat2.DisplayStateType     = Keplerian;
+SSO_Sat2.SMA                  = 6948.137;
+SSO_Sat2.ECC                  = 0.0011;
+SSO_Sat2.INC                  = 97.6704;
+SSO_Sat2.RAAN                 = 78.73;
+SSO_Sat2.AOP                  = 90;
+SSO_Sat2.TA                   = 180;
+SSO_Sat2.DryMass              = 300;
+SSO_Sat2.Cd                   = 2.2;
+SSO_Sat2.Cr                   = 1.8;
+SSO_Sat2.DragArea             = 2.2;
+SSO_Sat2.SRPArea              = 2.6;
+SSO_Sat2.Id                   = 'SSO-2';
+SSO_Sat2.OrbitColor           = Green;
+
+Create Spacecraft MidInc_Sat3;
+MidInc_Sat3.DateFormat        = UTCGregorian;
+MidInc_Sat3.Epoch             = '01 Jan 2027 00:00:00.000';
+MidInc_Sat3.CoordinateSystem  = EarthMJ2000Eq;
+MidInc_Sat3.DisplayStateType  = Keplerian;
+MidInc_Sat3.SMA               = 6948.137;
+MidInc_Sat3.ECC               = 0;
+MidInc_Sat3.INC               = 53;
+MidInc_Sat3.RAAN              = 0;
+MidInc_Sat3.AOP               = 0;
+MidInc_Sat3.TA                = 0;
+MidInc_Sat3.DryMass           = 300;
+MidInc_Sat3.Cd                = 2.2;
+MidInc_Sat3.Cr                = 1.8;
+MidInc_Sat3.DragArea          = 2.2;
+MidInc_Sat3.SRPArea           = 2.6;
+MidInc_Sat3.Id                = 'MID-3';
+MidInc_Sat3.OrbitColor         = Blue;
+
+
+%----------------------------------------
+%---------- ForceModel (all real perturbations)
+%----------------------------------------
+
+Create ForceModel HighFidelityFM;
+HighFidelityFM.CentralBody                 = Earth;
+HighFidelityFM.PrimaryBodies               = {Earth};
+HighFidelityFM.PointMasses                 = {Sun, Luna};
+HighFidelityFM.GravityField.Earth.Degree   = 20;
+HighFidelityFM.GravityField.Earth.Order    = 20;
+HighFidelityFM.GravityField.Earth.PotentialFile = 'EGM96.cof';
+HighFidelityFM.GravityField.Earth.TideModel = 'None';
+HighFidelityFM.Drag.AtmosphereModel        = JacchiaRoberts;
+HighFidelityFM.Drag.HistoricWeatherSource  = 'ConstantFluxAndGeoMag';
+HighFidelityFM.Drag.PredictedWeatherSource = 'SchattenFile';
+HighFidelityFM.Drag.SchattenFile           = '../data/atmosphere/earth/SchattenPredict.txt';
+HighFidelityFM.Drag.SchattenErrorModel     = 'Nominal';
+HighFidelityFM.Drag.SchattenTimingModel    = 'NominalCycle';
+HighFidelityFM.Drag.F107                   = 150;
+HighFidelityFM.Drag.F107A                  = 150;
+HighFidelityFM.Drag.MagneticIndex          = 3;
+HighFidelityFM.SRP                         = On;
+HighFidelityFM.SRP.Flux                    = 1367;
+HighFidelityFM.SRP.Nominal_Sun             = 149597870.691;
+HighFidelityFM.RelativisticCorrection      = On;
+HighFidelityFM.ErrorControl                = RSSStep;
+
+%----------------------------------------
+%---------- Propagator
+%----------------------------------------
+
+Create Propagator Prop;
+Prop.FM                       = HighFidelityFM;
+Prop.Type                     = RungeKutta89;
+Prop.InitialStepSize          = 60;
+Prop.Accuracy                 = 1e-12;
+Prop.MinStep                  = 0.001;
+Prop.MaxStep                  = 2700;
+Prop.MaxStepAttempts          = 50;
+Prop.StopIfAccuracyIsViolated = true;
+
+%----------------------------------------
+%---------- Burns (impulsive, VNB tangential)
+%----------------------------------------
+
+Create ImpulsiveBurn BurnSSO1;
+BurnSSO1.CoordinateSystem  = Local;
+BurnSSO1.Origin            = Earth;
+BurnSSO1.Axes              = VNB;
+BurnSSO1.Element1           = 0.0005;
+BurnSSO1.Element2           = 0;
+BurnSSO1.Element3           = 0;
+BurnSSO1.DecrementMass      = false;
+BurnSSO1.Isp                = 220;
+BurnSSO1.GravitationalAccel = 9.81;
+
+Create ImpulsiveBurn BurnSSO2;
+BurnSSO2.CoordinateSystem  = Local;
+BurnSSO2.Origin            = Earth;
+BurnSSO2.Axes              = VNB;
+BurnSSO2.Element1           = 0.0005;
+BurnSSO2.Element2           = 0;
+BurnSSO2.Element3           = 0;
+BurnSSO2.DecrementMass      = false;
+BurnSSO2.Isp                = 220;
+BurnSSO2.GravitationalAccel = 9.81;
+
+Create ImpulsiveBurn BurnMid3;
+BurnMid3.CoordinateSystem  = Local;
+BurnMid3.Origin            = Earth;
+BurnMid3.Axes              = VNB;
+BurnMid3.Element1           = 0.0005;
+BurnMid3.Element2           = 0;
+BurnMid3.Element3           = 0;
+BurnMid3.DecrementMass      = false;
+BurnMid3.Isp                = 220;
+BurnMid3.GravitationalAccel = 9.81;
+
+Create ImpulsiveBurn BurnPhase;
+BurnPhase.CoordinateSystem  = Local;
+BurnPhase.Origin            = Earth;
+BurnPhase.Axes              = VNB;
+BurnPhase.Element1           = 0.00005;
+BurnPhase.Element2           = 0;
+BurnPhase.Element3           = 0;
+BurnPhase.DecrementMass      = false;
+BurnPhase.Isp                = 220;
+BurnPhase.GravitationalAccel = 9.81;
+
+%----------------------------------------
+%---------- Solvers
+%----------------------------------------
+
+Create DifferentialCorrector DCStation;
+DCStation.ShowProgress       = false;
+DCStation.MaximumIterations  = 25;
+DCStation.DerivativeMethod   = ForwardDifference;
+
+Create DifferentialCorrector DCPhase;
+DCPhase.ShowProgress         = false;
+DCPhase.MaximumIterations    = 25;
+DCPhase.DerivativeMethod     = ForwardDifference;
+
+%----------------------------------------
+%---------- Mission parameters (Variables)
+%----------------------------------------
+
+Create Variable MissionDurationDays StepSizeDays;
+MissionDurationDays = 1826.25;      % 5 Julian years
+StepSizeDays         = 1;           % daily altitude-monitoring cadence
+
+Create Variable NominalSMA AltLowerBoundAlt;
+NominalSMA        = 6948.137;       % km, 570 km altitude circular SMA
+AltLowerBoundAlt  = 565;            % km, reboost trigger (5 km deadband)
+
+Create Variable PhaseToleranceDeg DriftDays PhaseCheckIntervalDays NextPhaseCheckDay;
+PhaseToleranceDeg      = 1.0;       % deg, in-plane phase deadband
+DriftDays               = 15;        % days, drift-orbit duration
+PhaseCheckIntervalDays  = 30;        % days between phase evaluations
+NextPhaseCheckDay       = 30;        % first phase check at day 30
+
+Create Variable MeanMotionDegPerDay;
+MeanMotionDegPerDay = 5396.38;      % deg/day, n = sqrt(mu/a^3) at NominalSMA
+
+Create Variable PhaseError DeltaA;
+
+Create Variable DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase;
+DVBudget_SSO1  = 0;
+DVBudget_SSO2  = 0;
+DVBudget_Mid3  = 0;
+DVBudget_Phase = 0;
+
+Create Variable ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
+ReboostCount_SSO1    = 0;
+ReboostCount_SSO2    = 0;
+ReboostCount_Mid3    = 0;
+PhaseCorrectionCount = 0;
+
+%----------------------------------------
+%---------- Subscribers
+%----------------------------------------
+
+Create ReportFile SSO1_Report;
+SSO1_Report.Filename    = 'SSO1_OrbitHistory.txt';
+SSO1_Report.WriteHeaders = true;
+SSO1_Report.Precision    = 16;
+
+Create ReportFile SSO2_Report;
+SSO2_Report.Filename    = 'SSO2_OrbitHistory.txt';
+SSO2_Report.WriteHeaders = true;
+SSO2_Report.Precision    = 16;
+
+Create ReportFile Mid3_Report;
+Mid3_Report.Filename    = 'Mid3_OrbitHistory.txt';
+Mid3_Report.WriteHeaders = true;
+Mid3_Report.Precision    = 16;
+
+Create ReportFile Constellation_Report;
+Constellation_Report.Filename    = 'Constellation_PhaseAndDeltaV.txt';
+Constellation_Report.WriteHeaders = true;
+Constellation_Report.Precision    = 16;
+
+Create OrbitView Constellation3D;
+Constellation3D.Add                  = {SSO_Sat1, SSO_Sat2, MidInc_Sat3, Earth};
+Constellation3D.CoordinateSystem     = EarthMJ2000Eq;
+Constellation3D.ViewPointReference   = Earth;
+Constellation3D.ViewPointVector      = [ 30000 0 0 ];
+Constellation3D.ViewDirection        = Earth;
+Constellation3D.ViewScaleFactor      = 1;
+Constellation3D.ViewUpAxis           = Z;
+Constellation3D.XYPlane              = On;
+Constellation3D.Axes                 = On;
+Constellation3D.EnableStars          = On;
+Constellation3D.SolverIterations     = None;
+Constellation3D.DataCollectFrequency = 20;
+Constellation3D.UpdatePlotFrequency  = 50;
+Constellation3D.ShowPlot             = true;
+
+Create XYPlot AltitudeHistory;
+AltitudeHistory.XVariable  = SSO_Sat1.A1ModJulian;
+AltitudeHistory.YVariables = {SSO_Sat1.Earth.Altitude, SSO_Sat2.Earth.Altitude, MidInc_Sat3.Earth.Altitude};
+AltitudeHistory.ShowGrid   = true;
+AltitudeHistory.ShowPlot   = true;
+AltitudeHistory.SolverIterations = None;
+
+
+%----------------------------------------
+%---------- Mission Sequence
+%----------------------------------------
+BeginMissionSequence;
+
+% Initial state snapshot
+Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude;
+Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude;
+Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Earth.ECC MidInc_Sat3.INC MidInc_Sat3.RAAN MidInc_Sat3.AOP MidInc_Sat3.TA MidInc_Sat3.Earth.Altitude;
+
+While SSO_Sat1.ElapsedDays < MissionDurationDays
+
+   % ---- Synchronized daily propagation of the whole constellation ----
+   Propagate 'DailyStep' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = StepSizeDays};
+
+   % ---- Orbit history logging ----
+   Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude;
+   Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude;
+   Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Earth.ECC MidInc_Sat3.INC MidInc_Sat3.RAAN MidInc_Sat3.AOP MidInc_Sat3.TA MidInc_Sat3.Earth.Altitude;
+
+   % ==================================================================
+   % 1) ALTITUDE / SMA STATION-KEEPING -- one independent check per sat
+   % ==================================================================
+
+   If SSO_Sat1.Earth.Altitude < AltLowerBoundAlt
+      Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
+         Vary DCStation(BurnSSO1.Element1 = 0.0005, {Perturbation = 0.0001, Lower = 0.0, Upper = 0.05, MaxStep = 0.0005});
+         Maneuver BurnSSO1(SSO_Sat1);
+         Achieve DCStation(SSO_Sat1.Earth.SMA = NominalSMA, {Tolerance = 0.1});
+      EndTarget;
+      DVBudget_SSO1 = DVBudget_SSO1 + abs(BurnSSO1.Element1) * 1000;
+      ReboostCount_SSO1 = ReboostCount_SSO1 + 1;
+   EndIf;
+
+   If SSO_Sat2.Earth.Altitude < AltLowerBoundAlt
+      Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
+         Vary DCStation(BurnSSO2.Element1 = 0.0005, {Perturbation = 0.0001, Lower = 0.0, Upper = 0.05, MaxStep = 0.0005});
+         Maneuver BurnSSO2(SSO_Sat2);
+         Achieve DCStation(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.1});
+      EndTarget;
+      DVBudget_SSO2 = DVBudget_SSO2 + abs(BurnSSO2.Element1) * 1000;
+      ReboostCount_SSO2 = ReboostCount_SSO2 + 1;
+   EndIf;
+
+   If MidInc_Sat3.Earth.Altitude < AltLowerBoundAlt
+      Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
+         Vary DCStation(BurnMid3.Element1 = 0.0005, {Perturbation = 0.0001, Lower = 0.0, Upper = 0.05, MaxStep = 0.0005});
+         Maneuver BurnMid3(MidInc_Sat3);
+         Achieve DCStation(MidInc_Sat3.Earth.SMA = NominalSMA, {Tolerance = 0.1});
+      EndTarget;
+      DVBudget_Mid3 = DVBudget_Mid3 + abs(BurnMid3.Element1) * 1000;
+      ReboostCount_Mid3 = ReboostCount_Mid3 + 1;
+   EndIf;
+
+   % ==================================================================
+   % 2) CONSTELLATION (IN-PLANE PHASE) KEEPING -- SSO_Sat1 / SSO_Sat2
+   %    Evaluated every PhaseCheckIntervalDays; corrected with a
+   %    drift-orbit maneuver pair (raise/lower SSO_Sat2, drift, restore)
+   % ==================================================================
+
+   If SSO_Sat1.ElapsedDays >= NextPhaseCheckDay
+
+      PhaseError = SSO_Sat2.TA - SSO_Sat1.TA - 180;
+      If PhaseError > 180
+         PhaseError = PhaseError - 360;
+      EndIf;
+      If PhaseError < -180
+         PhaseError = PhaseError + 360;
+      EndIf;
+
+      If abs(PhaseError) > PhaseToleranceDeg
+
+         % Linearized phasing relation:
+         % relative drift rate (deg/day) = -1.5 * n * (DeltaA/a)
+         % => DeltaA (km) needed to remove PhaseError over DriftDays:
+         DeltaA = (2 * NominalSMA * PhaseError) / (3 * MeanMotionDegPerDay * DriftDays);
+
+         % --- Burn 1: open the drift orbit on SSO_Sat2 ---
+         Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
+            Vary DCPhase(BurnPhase.Element1 = 0.00005, {Perturbation = 0.000005, Lower = -0.01, Upper = 0.01, MaxStep = 0.00005});
+            Maneuver BurnPhase(SSO_Sat2);
+            Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA + DeltaA, {Tolerance = 0.001});
+         EndTarget;
+         DVBudget_Phase = DVBudget_Phase + abs(BurnPhase.Element1) * 1000;
+
+         % --- Let the phase drift for DriftDays (synchronized propagation) ---
+         Propagate 'PhaseDrift' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = DriftDays};
+
+         % --- Burn 2: restore nominal altitude, locking in the corrected phase ---
+         Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
+            Vary DCPhase(BurnPhase.Element1 = -0.00005, {Perturbation = 0.000005, Lower = -0.01, Upper = 0.01, MaxStep = 0.00005});
+            Maneuver BurnPhase(SSO_Sat2);
+            Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
+         EndTarget;
+         DVBudget_Phase = DVBudget_Phase + abs(BurnPhase.Element1) * 1000;
+
+         PhaseCorrectionCount = PhaseCorrectionCount + 1;
+
+      EndIf;
+
+      Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
+
+      NextPhaseCheckDay = NextPhaseCheckDay + PhaseCheckIntervalDays;
+
+   EndIf;
+
+EndWhile;
+
+% ---- Final mission summary ----
+Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
