@@ -15,8 +15,10 @@
 %  ============================ KEY ASSUMPTIONS ============================
 %  These are mission-design placeholders. Replace with project values as
 %  they firm up (bus properties, launch epoch, coverage-driven RAAN, etc.):
-%    - Epoch (all 3 sats)   : 01 Jan 2027 00:00:00.000 UTC (assumed common
+%    - Epoch (all 3 sats)   : 01 Oct 2028 00:00:00.000 UTC (assumed common
 %                              deployment epoch; adjust to actual launch date)
+%    - Reference frame       : EarthICRF (all spacecraft states and the
+%                              constellation 3-D view)
 %    - Spacecraft bus       : DryMass 300 kg, Cd 2.2, Cr 1.8,
 %                              DragArea 2.2 m^2, SRPArea 2.6 m^2 (all 3 sats
 %                              assumed to share a common bus per procurement)
@@ -31,7 +33,7 @@
 %                              e_frozen = -(J3/2J2)*(Re/a)*sin(i), which
 %                              keeps the perigee argument (and mean altitude
 %                              per latitude) from secular drift
-%    - SSO RAAN              : 78.73 deg, chosen (via a low-precision solar
+%    - SSO RAAN              : 345.16 deg, chosen (via a low-precision solar
 %                              ephemeris at the epoch above) to give an
 %                              LTDN (descending-node local time) of
 %                              approximately 10:30, a typical EO choice.
@@ -77,13 +79,13 @@
 
 Create Spacecraft SSO_Sat1;
 SSO_Sat1.DateFormat           = UTCGregorian;
-SSO_Sat1.Epoch                = '01 Jan 2027 00:00:00.000';
-SSO_Sat1.CoordinateSystem     = EarthMJ2000Eq;
+SSO_Sat1.Epoch                = '01 Oct 2028 00:00:00.000';
+SSO_Sat1.CoordinateSystem     = EarthICRF;
 SSO_Sat1.DisplayStateType     = BrouwerMeanShort;
 SSO_Sat1.BrouwerShortSMA      = 6948.137;
 SSO_Sat1.BrouwerShortECC      = 0.0011;
 SSO_Sat1.BrouwerShortINC      = 97.6704;
-SSO_Sat1.BrouwerShortRAAN     = 78.73;
+SSO_Sat1.BrouwerShortRAAN     = 345.16;
 SSO_Sat1.BrouwerShortAOP      = 90;
 SSO_Sat1.BrouwerShortMA       = 0;
 SSO_Sat1.DryMass              = 300;
@@ -96,13 +98,13 @@ SSO_Sat1.OrbitColor           = Red;
 
 Create Spacecraft SSO_Sat2;
 SSO_Sat2.DateFormat           = UTCGregorian;
-SSO_Sat2.Epoch                = '01 Jan 2027 00:00:00.000';
-SSO_Sat2.CoordinateSystem     = EarthMJ2000Eq;
+SSO_Sat2.Epoch                = '01 Oct 2028 00:00:00.000';
+SSO_Sat2.CoordinateSystem     = EarthICRF;
 SSO_Sat2.DisplayStateType     = BrouwerMeanShort;
 SSO_Sat2.BrouwerShortSMA      = 6948.137;
 SSO_Sat2.BrouwerShortECC      = 0.0011;
 SSO_Sat2.BrouwerShortINC      = 97.6704;
-SSO_Sat2.BrouwerShortRAAN     = 78.73;
+SSO_Sat2.BrouwerShortRAAN     = 345.16;
 SSO_Sat2.BrouwerShortAOP      = 90;
 SSO_Sat2.BrouwerShortMA       = 180;
 SSO_Sat2.DryMass              = 300;
@@ -115,8 +117,8 @@ SSO_Sat2.OrbitColor           = Green;
 
 Create Spacecraft MidInc_Sat3;
 MidInc_Sat3.DateFormat        = UTCGregorian;
-MidInc_Sat3.Epoch             = '01 Jan 2027 00:00:00.000';
-MidInc_Sat3.CoordinateSystem  = EarthMJ2000Eq;
+MidInc_Sat3.Epoch             = '01 Oct 2028 00:00:00.000';
+MidInc_Sat3.CoordinateSystem  = EarthICRF;
 MidInc_Sat3.DisplayStateType  = BrouwerMeanShort;
 MidInc_Sat3.BrouwerShortSMA   = 6948.137;
 MidInc_Sat3.BrouwerShortECC   = 0.001;
@@ -297,7 +299,7 @@ Constellation_Report.Precision    = 16;
 
 Create OrbitView Constellation3D;
 Constellation3D.Add                  = {SSO_Sat1, SSO_Sat2, MidInc_Sat3, Earth};
-Constellation3D.CoordinateSystem     = EarthMJ2000Eq;
+Constellation3D.CoordinateSystem     = EarthICRF;
 Constellation3D.ViewPointReference   = Earth;
 Constellation3D.ViewPointVector      = [ 30000 0 0 ];
 Constellation3D.ViewDirection        = Earth;
