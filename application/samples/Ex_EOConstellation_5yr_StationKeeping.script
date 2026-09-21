@@ -2,15 +2,21 @@
 %  Ex_EOConstellation_5yr_StationKeeping
 %
 %  Mission analysis script for a 3-satellite Earth-observation constellation:
-%    - SSO_Sat1, SSO_Sat2 : co-planar Sun-synchronous orbit (SSO)
-%    - MidInc_Sat3        : mid-inclination (53 deg) orbit
+%    - SSO_Sat1, SSO_Sat2 : co-planar Sun-synchronous orbit (SSO), flying a
+%                            reconfigurable along-track tandem formation
+%    - MidInc_Sat3        : mid-inclination (53 deg) orbit, independent
 %  All three satellites fly at a nominal altitude of 570 km.
 %
-%  Scope: 5-year (1826.25-day) high-fidelity propagation with a full real-
+%  Scope: 3-year (1095.75-day) high-fidelity propagation with a full real-
 %  world perturbation model, plus automated:
-%    (1) altitude / SMA station-keeping (drag makeup) for each spacecraft
-%    (2) in-plane phasing ("constellation-keeping") between SSO_Sat1 and
-%        SSO_Sat2 using a drift-orbit (differential-SMA) maneuver pair
+%    (1) altitude / SMA station-keeping (drag makeup) for each spacecraft,
+%        with a deliberately loose deadband (see "Altitude deadband" below)
+%    (2) relative-distance ("formation") control between SSO_Sat1 and
+%        SSO_Sat2: the along-track separation is retargeted every ~3 months
+%        per a preset schedule spanning ~1000 km down to ~50 km, held with
+%        a wide, distance-proportional tolerance, and corrected with a
+%        deliberately slow (weeks-long) drift-orbit maneuver pair chosen to
+%        minimize deltaV (see "Relative-distance formation control" below)
 %
 %  ============================ KEY ASSUMPTIONS ============================
 %  These are mission-design placeholders. Replace with project values as
@@ -34,8 +40,9 @@
 %                              spacecraft carries a 6 kg propellant budget
 %                              (ElectricTank); SSO_Sat2 carries a second,
 %                              reverse-facing thruster so it can both
-%                              raise and lower its orbit for phasing
-%                              (see "SSO in-plane phasing" below).
+%                              raise and lower its orbit for reconfiguration
+%                              (see "Relative-distance formation control"
+%                              below).
 %                              Station-keeping/phasing maneuvers are
 %                              commanded as BeginFiniteBurn/EndFiniteBurn
 %                              pairs bracketing a targeted burn duration
@@ -58,10 +65,66 @@
 %                              Re-solve precisely in GMAT (Sun RA report) or
 %                              with a dedicated LTAN targeter once the actual
 %                              launch epoch is fixed.
-%    - SSO in-plane phasing  : Sat1/Sat2 separated by 180 deg in mean
-%                              anomaly (opposite sides of the shared plane)
-%                              for even ground-track distribution. Adjust to
-%                              the mission's actual revisit/coverage design.
+%    - Altitude deadband     : 10 km (AltLowerBoundAlt below), widened from
+%                              an earlier, tighter 5 km. Per-maneuver deltaV
+%                              to restore a given altitude deficit is close
+%                              to deadband-independent for this drag regime
+%                              (you always repay the same accumulated decay,
+%                              just in bigger or smaller installments), so a
+%                              wider band mainly trades maneuver COUNT (and
+%                              thus ops overhead) for a slightly lower mean
+%                              altitude between reboosts -- negligible extra
+%                              drag/deltaV at 10 km out of 570 km. This also
+%                              gives SSO_Sat1/SSO_Sat2 more independent slack
+%                              before either one needs a correction, which
+%                              indirectly reduces how often the relative-
+%                              distance control below has to intervene too.
+%                              "Not super tight" per the requirement; revisit
+%                              if a firm deltaV/ops-cost tradeoff becomes
+%                              available.
+%    - Relative-distance     : replaces a fixed 180 deg phasing with a
+%      formation control        reconfigurable along-track separation
+%                              between SSO_Sat1 and SSO_Sat2, computed from
+%                              their true-anomaly difference (equivalent to
+%                              the 3-D range to <0.1% at these separations,
+%                              since both fly the same near-circular orbit).
+%                              Re-evaluated every PhaseCheckIntervalDays
+%                              (90 days, "every few months"): the target
+%                              distance steps through TargetDistanceKmSchedule
+%                              = [1000, 700, 500, 350, 250, 175, 125, 90, 65,
+%                              50] km (holds at 50 km once exhausted), and a
+%                              correction fires only if the actual separation
+%                              is outside DistanceToleranceFraction (+/-15%)
+%                              of the current target -- "not super tight,
+%                              a bit offset is better." The +/-15% choice is
+%                              a reasoned default, not a rigorously solved
+%                              optimum: a wider band cuts maneuver count and
+%                              total deltaV directly (fewer corrections for
+%                              the same schedule), and scaling it as a
+%                              percentage (rather than a fixed km value)
+%                              keeps the deadband meaningful across the full
+%                              1000-to-50 km range. Refine with real ops-cost
+%                              and deltaV-value inputs if available.
+%                              Each correction uses the same drift-orbit
+%                              (open/drift/restore) maneuver pair as before,
+%                              but DriftDays = 21 (3 weeks) instead of a
+%                              shorter value -- deliberately generous, since
+%                              for this linearized relative-motion relation
+%                              deltaV for a given distance change scales as
+%                              ~1/DriftDays: the requirement explicitly
+%                              allows weeks-long reconfigurations because
+%                              that is the deltaV-minimizing choice, and no
+%                              payload activity needs to be preserved during
+%                              a maneuver.
+%                              Initial separation is set to ~1000 km (the
+%                              schedule's first entry) so there is no
+%                              artificial correction right at mission start.
+%                              Collision-avoidance and de-orbit assumptions
+%                              are unchanged from any separate delta-V budget
+%                              this script's outputs feed -- neither is
+%                              modeled here (out of scope for this script;
+%                              even the closest scheduled separation, 50 km,
+%                              is well outside close-proximity CA territory).
 %    - Mid-inclination plane : RAAN = 0 deg, MA = 0 deg are placeholders --
 %                              select based on the target coverage band /
 %                              longitude of interest.
@@ -82,7 +145,7 @@
 %                              reports osculating values, as is standard for
 %                              propagation and station-keeping goals.
 %    - No inclination-control burns are budgeted: at 570 km, drag and SRP do
-%      not drive meaningful secular inclination drift over 5 years, so only
+%      not drive meaningful secular inclination drift over the 3-year mission, so only
 %      in-plane (SMA/altitude) control is modeled. RAAN/LTAN stability for
 %      the SSO pair is a direct consequence of holding altitude (and hence
 %      the J2 nodal precession rate) inside its deadband; it is not
@@ -92,7 +155,7 @@
 %      impulsive delta-v), so every differential-corrector iteration
 %      re-propagates the full constellation through a multi-hour-to-~1-day
 %      thrust arc. This script is correspondingly much slower to run than
-%      an impulsive-burn version -- expect a long run for the full 5-year,
+%      an impulsive-burn version -- expect a long run for the full 3-year,
 %      3-spacecraft case.
 %    - Performance tuning: the dominant cause of a run getting progressively
 %      slower/laggier over time is the live 3-D view (Constellation3D) and
@@ -101,7 +164,7 @@
 %      itself. Two mitigations are applied here, both tunable:
 %        (1) StepSizeDays = 3 (below) instead of 1, cutting the number of
 %            Propagate/Report/redraw events ~3x while still comfortably
-%            resolving the 5 km altitude deadband.
+%            resolving the 10 km altitude deadband.
 %        (2) GravityField.Earth.Degree/Order = 10 (below) instead of 20,
 %            since J2-J4-dominated secular effects (what this mission design
 %            actually depends on) don't need 20x20 fidelity, and harmonic
@@ -119,7 +182,7 @@
 %      pair therefore uses the "Synchronized Prop(Sat1) Prop(Sat2) Prop(Sat3)"
 %      form (one Propagator clause per spacecraft, time-synchronized) instead
 %      of the simpler "Prop(Sat1, Sat2, Sat3)" form. The pure-coast
-%      propagations (MonitoringStep, PhaseDrift), where no burn is active, keep
+%      propagations (MonitoringStep, ReconfigDrift), where no burn is active, keep
 %      the simpler multi-spacecraft-per-Propagator form.
 %  ===========================================================================
 %----------------------------------------------------------------------------
@@ -165,7 +228,11 @@ SSO_Sat2.BrouwerShortECC      = 0.0011;
 SSO_Sat2.BrouwerShortINC      = 97.6704;
 SSO_Sat2.BrouwerShortRAAN     = 345.16;
 SSO_Sat2.BrouwerShortAOP      = 90;
-SSO_Sat2.BrouwerShortMA       = 180;
+SSO_Sat2.BrouwerShortMA       = 8.2462;    % ~1000 km along-track separation
+                                            % from SSO_Sat1 -- matches the
+                                            % first entry of the relative-
+                                            % distance reconfiguration
+                                            % schedule (see header/Variables)
 SSO_Sat2.DryMass              = 300;
 SSO_Sat2.Cd                   = 2.2;
 SSO_Sat2.Cr                   = 1.8;
@@ -324,9 +391,9 @@ ElectricThruster_SSO2_Pro.Isp                = 1500;
 ElectricThruster_SSO2_Pro.ConstantThrust     = 0.01;
 
 % Reverse-facing thruster, shares SSO_Sat2's tank -- needed because a
-% phasing correction must be able to both raise AND lower the orbit
-% (see "SSO in-plane phasing" in the header), which a single fixed-
-% direction electric thruster cannot do.
+% reconfiguration maneuver must be able to both raise AND lower the orbit
+% (see "Relative-distance formation control" in the header), which a
+% single fixed-direction electric thruster cannot do.
 Create ElectricThruster ElectricThruster_SSO2_Retro;
 ElectricThruster_SSO2_Retro.CoordinateSystem   = Local;
 ElectricThruster_SSO2_Retro.Origin             = Earth;
@@ -436,29 +503,52 @@ DCPhase2.DerivativeMethod     = ForwardDifference;
 %----------------------------------------
 
 Create Variable MissionDurationDays StepSizeDays;
-MissionDurationDays = 1826.25;      % 5 Julian years
+MissionDurationDays = 1095.75;      % 3 Julian years
 StepSizeDays         = 3;           % altitude-monitoring cadence (days) --
                                      % larger = fewer Propagate/Report/redraw
                                      % events and a faster run, at the cost of
                                      % coarser altitude-deadband resolution.
-                                     % 3 days is small relative to the 5 km
+                                     % 3 days is small relative to the 10 km
                                      % deadband's multi-week fill time; drop
                                      % back to 1 if you tighten the deadband.
 
 Create Variable NominalSMA AltLowerBoundAlt;
 NominalSMA        = 6948.137;       % km, 570 km altitude circular SMA
-AltLowerBoundAlt  = 565;            % km, reboost trigger (5 km deadband)
+AltLowerBoundAlt  = 560;            % km, reboost trigger (10 km deadband --
+                                     % widened from an earlier 5 km; see
+                                     % "Altitude deadband" note in the header)
 
-Create Variable PhaseToleranceDeg DriftDays PhaseCheckIntervalDays NextPhaseCheckDay;
-PhaseToleranceDeg      = 1.0;       % deg, in-plane phase deadband
-DriftDays               = 15;        % days, drift-orbit duration
-PhaseCheckIntervalDays  = 30;        % days between phase evaluations
-NextPhaseCheckDay       = 30;        % first phase check at day 30
+% ---- Reconfigurable relative-distance ("formation") control, SSO_Sat1/2 ----
+% See "Relative-distance formation control" in the header for the physics
+% and the deltaV-vs-deadband reasoning behind these choices.
+Create Variable KmPerDegree MeanMotionDegPerDay;
+KmPerDegree          = 121.26786752964124;  % km/deg along-track at NominalSMA
+                                             % (= NominalSMA * pi/180)
+MeanMotionDegPerDay  = 5396.38;             % deg/day, n = sqrt(mu/a^3)
 
-Create Variable MeanMotionDegPerDay;
-MeanMotionDegPerDay = 5396.38;      % deg/day, n = sqrt(mu/a^3) at NominalSMA
+Create Array TargetDistanceKmSchedule[1,10];
+Create Variable ScheduleIndex ScheduleMaxIndex;
+ScheduleIndex    = 1;
+ScheduleMaxIndex = 10;
 
-Create Variable PhaseError AbsPhaseError DeltaA PhaseTargetSMA;
+Create Variable DistanceToleranceFraction DriftDays PhaseCheckIntervalDays NextPhaseCheckDay;
+DistanceToleranceFraction = 0.15;   % +/- 15% of the current target distance --
+                                     % "not super tight": a wide, distance-
+                                     % proportional deadband minimizes both
+                                     % maneuver count and total deltaV (see
+                                     % header). Tighten if pointing/baseline
+                                     % accuracy needs demand it.
+DriftDays                 = 21;     % days, drift-orbit duration -- generous
+                                     % on purpose: deltaV for a given distance
+                                     % change scales as 1/DriftDays, so taking
+                                     % weeks (as the requirement allows) is
+                                     % the deltaV-minimizing choice.
+PhaseCheckIntervalDays     = 90;     % days between reconfiguration checks --
+                                      % "maneuvers every few months"
+NextPhaseCheckDay          = 90;     % first check/retarget at day 90
+
+Create Variable CurrentTargetDistanceKm PhiCurrentDeg PhiSign PhiTargetDeg;
+Create Variable RelativeDistanceKm DistanceErrorKm ToleranceKm DeltaA PhaseTargetSMA;
 
 Create Variable BurnDurationSSO1 BurnDurationSSO2 BurnDurationMid3;
 BurnDurationSSO1 = 82000;           % sec, initial guess (~1 day @ 10 mN/300 kg)
@@ -466,8 +556,11 @@ BurnDurationSSO2 = 82000;
 BurnDurationMid3 = 82000;
 
 Create Variable PhaseBurnDuration1 PhaseBurnDuration2;
-PhaseBurnDuration1 = 1200;          % sec, initial guess for phasing burns
-PhaseBurnDuration2 = 1200;
+PhaseBurnDuration1 = 500;           % sec, initial guess -- reconfiguration
+PhaseBurnDuration2 = 500;           % burns range from ~80 s (smallest step,
+                                     % 65->50 km) to ~1650 s (largest, 1000->
+                                     % 700 km) at DriftDays = 21; 500 s splits
+                                     % the difference for faster DC convergence.
 
 Create Variable ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
 ReboostCount_SSO1    = 0;
@@ -535,6 +628,22 @@ AltitudeHistory.SolverIterations = None;
 %----------------------------------------
 BeginMissionSequence;
 
+% Relative-distance reconfiguration schedule (km); see header and the
+% "Relative-distance formation control" Variables note above. Stepped
+% roughly geometrically from 1000 km down to 50 km; holds at 50 km once
+% ScheduleIndex reaches ScheduleMaxIndex.
+TargetDistanceKmSchedule(1,1)  = 1000;
+TargetDistanceKmSchedule(1,2)  = 700;
+TargetDistanceKmSchedule(1,3)  = 500;
+TargetDistanceKmSchedule(1,4)  = 350;
+TargetDistanceKmSchedule(1,5)  = 250;
+TargetDistanceKmSchedule(1,6)  = 175;
+TargetDistanceKmSchedule(1,7)  = 125;
+TargetDistanceKmSchedule(1,8)  = 90;
+TargetDistanceKmSchedule(1,9)  = 65;
+TargetDistanceKmSchedule(1,10) = 50;
+CurrentTargetDistanceKm = TargetDistanceKmSchedule(1, ScheduleIndex);
+
 % Initial state snapshot
 Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude SSO_Sat1.ElectricTank_SSO1.FuelMass;
 Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude SSO_Sat2.ElectricTank_SSO2.FuelMass;
@@ -588,29 +697,51 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
    EndIf;
 
    % ==================================================================
-   % 2) CONSTELLATION (IN-PLANE PHASE) KEEPING -- SSO_Sat1 / SSO_Sat2
-   %    Evaluated every PhaseCheckIntervalDays; corrected with a
-   %    drift-orbit maneuver pair (raise/lower SSO_Sat2, drift, restore)
+   % 2) RELATIVE-DISTANCE ("FORMATION") CONTROL -- SSO_Sat1 / SSO_Sat2
+   %    Evaluated every PhaseCheckIntervalDays: advances the target-
+   %    distance schedule (see header), then corrects with a drift-orbit
+   %    maneuver pair (open/drift/restore) if the actual along-track
+   %    separation has drifted outside DistanceToleranceFraction of the
+   %    (possibly just-updated) current target.
    % ==================================================================
 
    If SSO_Sat1.ElapsedDays >= NextPhaseCheckDay
 
-      PhaseError = SSO_Sat2.TA - SSO_Sat1.TA - 180;
-      If PhaseError > 180
-         PhaseError = PhaseError - 360;
+      If ScheduleIndex < ScheduleMaxIndex
+         ScheduleIndex = ScheduleIndex + 1;
       EndIf;
-      If PhaseError < -180
-         PhaseError = PhaseError + 360;
+      CurrentTargetDistanceKm = TargetDistanceKmSchedule(1, ScheduleIndex);
+
+      PhiCurrentDeg = SSO_Sat2.TA - SSO_Sat1.TA;
+      If PhiCurrentDeg > 180
+         PhiCurrentDeg = PhiCurrentDeg - 360;
+      EndIf;
+      If PhiCurrentDeg < -180
+         PhiCurrentDeg = PhiCurrentDeg + 360;
       EndIf;
 
-      AbsPhaseError = abs(PhaseError);
+      If PhiCurrentDeg >= 0
+         PhiSign = 1;
+      Else
+         PhiSign = -1;
+      EndIf;
 
-      If AbsPhaseError > PhaseToleranceDeg
+      RelativeDistanceKm = abs(PhiCurrentDeg) * KmPerDegree;
+      DistanceErrorKm    = RelativeDistanceKm - CurrentTargetDistanceKm;
+      ToleranceKm        = DistanceToleranceFraction * CurrentTargetDistanceKm;
 
-         % Linearized phasing relation:
+      If abs(DistanceErrorKm) > ToleranceKm
+
+         % Preserve which satellite is ahead (PhiSign); only the magnitude
+         % of the separation is retargeted, so no side-swap maneuver is
+         % ever needed for this monotonically-shrinking schedule.
+         PhiTargetDeg = PhiSign * (CurrentTargetDistanceKm / KmPerDegree);
+
+         % Linearized relative-motion relation:
          % relative drift rate (deg/day) = -1.5 * n * (DeltaA/a)
-         % => DeltaA (km) needed to remove PhaseError over DriftDays:
-         DeltaA = (2 * NominalSMA * PhaseError) / (3 * MeanMotionDegPerDay * DriftDays);
+         % => DeltaA (km) needed to move PhiCurrentDeg to PhiTargetDeg
+         %    over DriftDays:
+         DeltaA = (2 * NominalSMA * (PhiCurrentDeg - PhiTargetDeg)) / (3 * MeanMotionDegPerDay * DriftDays);
          PhaseTargetSMA = NominalSMA + DeltaA;
 
          % --- Burn 1: open the drift orbit on SSO_Sat2 ---
@@ -619,39 +750,39 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
          % thruster burn 1 did not, since it undoes the SMA offset.
          If DeltaA > 0
             Target DCPhase1 {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase1(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               Vary DCPhase1(PhaseBurnDuration1 = 500, {Perturbation = 20, Lower = 0.0, Upper = 5000, MaxStep = 300});
                BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-               Propagate 'Phase Burn 1 (raise)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
+               Propagate 'Reconfig Burn 1 (raise)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
                EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
                Achieve DCPhase1(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
             EndTarget;
          Else
             Target DCPhase1 {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase1(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               Vary DCPhase1(PhaseBurnDuration1 = 500, {Perturbation = 20, Lower = 0.0, Upper = 5000, MaxStep = 300});
                BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
-               Propagate 'Phase Burn 1 (lower)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
+               Propagate 'Reconfig Burn 1 (lower)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
                EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
                Achieve DCPhase1(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
             EndTarget;
          EndIf;
 
-         % --- Let the phase drift for DriftDays (synchronized propagation) ---
-         Propagate 'PhaseDrift' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = DriftDays};
+         % --- Let the separation drift for DriftDays (synchronized propagation) ---
+         Propagate 'ReconfigDrift' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = DriftDays};
 
-         % --- Burn 2: restore nominal altitude, locking in the corrected phase ---
+         % --- Burn 2: restore nominal altitude, locking in the new separation ---
          If DeltaA > 0
             Target DCPhase2 {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase2(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               Vary DCPhase2(PhaseBurnDuration2 = 500, {Perturbation = 20, Lower = 0.0, Upper = 5000, MaxStep = 300});
                BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
-               Propagate 'Phase Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
+               Propagate 'Reconfig Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
                EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
                Achieve DCPhase2(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
             EndTarget;
          Else
             Target DCPhase2 {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase2(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               Vary DCPhase2(PhaseBurnDuration2 = 500, {Perturbation = 20, Lower = 0.0, Upper = 5000, MaxStep = 300});
                BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-               Propagate 'Phase Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
+               Propagate 'Reconfig Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
                EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
                Achieve DCPhase2(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
             EndTarget;
@@ -661,7 +792,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
 
       EndIf;
 
-      Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA SSO_Sat1.ElectricTank_SSO1.FuelMass SSO_Sat2.ElectricTank_SSO2.FuelMass MidInc_Sat3.ElectricTank_Mid3.FuelMass ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
+      Report Constellation_Report SSO_Sat1.UTCGregorian CurrentTargetDistanceKm RelativeDistanceKm DistanceErrorKm SSO_Sat1.ElectricTank_SSO1.FuelMass SSO_Sat2.ElectricTank_SSO2.FuelMass MidInc_Sat3.ElectricTank_Mid3.FuelMass ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
 
       NextPhaseCheckDay = NextPhaseCheckDay + PhaseCheckIntervalDays;
 
@@ -670,4 +801,4 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
 EndWhile;
 
 % ---- Final mission summary ----
-Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA SSO_Sat1.ElectricTank_SSO1.FuelMass SSO_Sat2.ElectricTank_SSO2.FuelMass MidInc_Sat3.ElectricTank_Mid3.FuelMass ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
+Report Constellation_Report SSO_Sat1.UTCGregorian CurrentTargetDistanceKm RelativeDistanceKm DistanceErrorKm SSO_Sat1.ElectricTank_SSO1.FuelMass SSO_Sat2.ElectricTank_SSO2.FuelMass MidInc_Sat3.ElectricTank_Mid3.FuelMass ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
