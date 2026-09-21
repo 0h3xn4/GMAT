@@ -257,7 +257,7 @@ NextPhaseCheckDay       = 30;        % first phase check at day 30
 Create Variable MeanMotionDegPerDay;
 MeanMotionDegPerDay = 5396.38;      % deg/day, n = sqrt(mu/a^3) at NominalSMA
 
-Create Variable PhaseError DeltaA;
+Create Variable PhaseError AbsPhaseError DeltaA PhaseTargetSMA;
 
 Create Variable DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase;
 DVBudget_SSO1  = 0;
@@ -389,18 +389,21 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
          PhaseError = PhaseError + 360;
       EndIf;
 
-      If abs(PhaseError) > PhaseToleranceDeg
+      AbsPhaseError = abs(PhaseError);
+
+      If AbsPhaseError > PhaseToleranceDeg
 
          % Linearized phasing relation:
          % relative drift rate (deg/day) = -1.5 * n * (DeltaA/a)
          % => DeltaA (km) needed to remove PhaseError over DriftDays:
          DeltaA = (2 * NominalSMA * PhaseError) / (3 * MeanMotionDegPerDay * DriftDays);
+         PhaseTargetSMA = NominalSMA + DeltaA;
 
          % --- Burn 1: open the drift orbit on SSO_Sat2 ---
          Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
             Vary DCPhase(BurnPhase.Element1 = 0.00005, {Perturbation = 0.000005, Lower = -0.01, Upper = 0.01, MaxStep = 0.00005});
             Maneuver BurnPhase(SSO_Sat2);
-            Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA + DeltaA, {Tolerance = 0.001});
+            Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
          EndTarget;
          DVBudget_Phase = DVBudget_Phase + abs(BurnPhase.Element1) * 1000;
 
