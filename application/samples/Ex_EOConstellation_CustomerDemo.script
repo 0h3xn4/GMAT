@@ -160,11 +160,24 @@ Create Propagator Prop;
 Prop.FM                       = HighFidelityFM;
 Prop.Type                     = RungeKutta89;
 Prop.InitialStepSize          = 60;
-Prop.Accuracy                 = 1e-12;
+Prop.Accuracy                 = 1e-9;   % loosened from 1e-12 -- see note below
 Prop.MinStep                  = 0.001;
 Prop.MaxStep                  = 2700;
-Prop.MaxStepAttempts          = 50;
+Prop.MaxStepAttempts          = 75;
 Prop.StopIfAccuracyIsViolated = true;
+% NOTE: a multi-hour electric-propulsion burn at 570 km spans several orbits,
+% and the SolarPowerSystem-gated thruster switches thrust fully on/off at
+% every eclipse entry/exit within that burn -- a genuine discontinuity in
+% the acceleration RK89 has to resolve. At Accuracy = 1e-12 (the value used
+% in GMAT's own EP tutorial scripts, which don't happen to combine LEO
+% eclipse cycling with a multi-orbit continuous burn) the integrator can
+% shrink all the way to MinStep at one of these discontinuities without
+% satisfying that tolerance, throwing "Accuracy settings will be violated
+% with current step size values." 1e-9 is still far tighter than anything
+% this script actually depends on (the SMA/phase Achieve tolerances are
+% 0.1 km / 0.001 km, i.e. 1e-5-1e-8 relative -- nowhere near 1e-12), so this
+% gives the integrator headroom at eclipse transitions without giving up any
+% accuracy that matters to the analysis.
 
 %----------------------------------------
 %---------- Hardware Components (electric propulsion -- unchanged)
