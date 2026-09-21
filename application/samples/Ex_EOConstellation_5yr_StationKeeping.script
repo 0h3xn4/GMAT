@@ -439,8 +439,6 @@ Constellation3D.Axes                 = On;
 Constellation3D.XYPlane              = On;
 Constellation3D.EclipticPlane        = Off;
 Constellation3D.EnableStars          = On;
-Constellation3D.DataCollectFrequency = 20;
-Constellation3D.UpdatePlotFrequency  = 50;
 Constellation3D.ShowPlot             = true;
 
 Create OpenFramesView Constellation3D_View;
