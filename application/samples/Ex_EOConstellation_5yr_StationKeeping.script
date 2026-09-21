@@ -22,8 +22,26 @@
 %    - Spacecraft bus       : DryMass 300 kg, Cd 2.2, Cr 1.8,
 %                              DragArea 2.2 m^2, SRPArea 2.6 m^2 (all 3 sats
 %                              assumed to share a common bus per procurement)
-%    - Propulsion            : monopropellant-class impulsive burns,
-%                              Isp = 220 s (swap for EP Isp if applicable)
+%    - Propulsion            : electric propulsion (EP) only, modeled as
+%                              finite (non-impulsive) burns via a
+%                              ConstantThrustAndIsp ElectricThruster:
+%                              10 mN thrust, Isp = 1500 s (representative
+%                              smallsat Hall-effect-class unit -- replace
+%                              with the as-selected thruster's specs).
+%                              A shared SolarPowerSystem gates thrust on
+%                              available power, so burns are automatically
+%                              throttled/paused through eclipse. Each
+%                              spacecraft carries a 6 kg propellant budget
+%                              (ElectricTank); SSO_Sat2 carries a second,
+%                              reverse-facing thruster so it can both
+%                              raise and lower its orbit for phasing
+%                              (see "SSO in-plane phasing" below).
+%                              Station-keeping/phasing maneuvers are
+%                              commanded as BeginFiniteBurn/EndFiniteBurn
+%                              pairs bracketing a targeted burn duration
+%                              (variable, typically tens of minutes to
+%                              ~1 day for this thrust level), not
+%                              instantaneous impulsive burns.
 %    - SSO inclination       : 97.6704 deg, solved from
 %                              dRAAN/dt = -1.5*n*J2*(Re/a)^2*cos(i) set equal
 %                              to the mean solar rate (360/365.2421897 deg/day)
@@ -69,6 +87,14 @@
 %      the SSO pair is a direct consequence of holding altitude (and hence
 %      the J2 nodal precession rate) inside its deadband; it is not
 %      separately targeted here.
+%    - Runtime cost: each station-keeping/phasing maneuver now targets a
+%      *burn duration* on a low-thrust engine (instead of an instantaneous
+%      impulsive delta-v), so every differential-corrector iteration
+%      re-propagates the full constellation through a multi-hour-to-~1-day
+%      thrust arc. This script is correspondingly much slower to run than
+%      an impulsive-burn version -- expect a long run for the full 5-year,
+%      3-spacecraft case. Consider running headless (no GUI plots) for the
+%      full-duration production run.
 %  ===========================================================================
 %----------------------------------------------------------------------------
 
@@ -95,6 +121,9 @@ SSO_Sat1.Cd                   = 2.2;
 SSO_Sat1.Cr                   = 1.8;
 SSO_Sat1.DragArea             = 2.2;
 SSO_Sat1.SRPArea              = 2.6;
+SSO_Sat1.Tanks                = {ElectricTank_SSO1};
+SSO_Sat1.Thrusters            = {ElectricThruster_SSO1_Pro};
+SSO_Sat1.PowerSystem          = SolarPowerSystemEO;
 SSO_Sat1.Id                   = 'SSO-1';
 SSO_Sat1.OrbitColor           = Red;
 
@@ -116,6 +145,9 @@ SSO_Sat2.Cd                   = 2.2;
 SSO_Sat2.Cr                   = 1.8;
 SSO_Sat2.DragArea             = 2.2;
 SSO_Sat2.SRPArea              = 2.6;
+SSO_Sat2.Tanks                = {ElectricTank_SSO2};
+SSO_Sat2.Thrusters            = {ElectricThruster_SSO2_Pro, ElectricThruster_SSO2_Retro};
+SSO_Sat2.PowerSystem          = SolarPowerSystemEO;
 SSO_Sat2.Id                   = 'SSO-2';
 SSO_Sat2.OrbitColor           = Green;
 
@@ -137,6 +169,9 @@ MidInc_Sat3.Cd                = 2.2;
 MidInc_Sat3.Cr                = 1.8;
 MidInc_Sat3.DragArea          = 2.2;
 MidInc_Sat3.SRPArea           = 2.6;
+MidInc_Sat3.Tanks             = {ElectricTank_Mid3};
+MidInc_Sat3.Thrusters         = {ElectricThruster_Mid3_Pro};
+MidInc_Sat3.PowerSystem       = SolarPowerSystemEO;
 MidInc_Sat3.Id                = 'MID-3';
 MidInc_Sat3.OrbitColor         = Blue;
 
@@ -183,52 +218,137 @@ Prop.MaxStepAttempts          = 50;
 Prop.StopIfAccuracyIsViolated = true;
 
 %----------------------------------------
-%---------- Burns (impulsive, VNB tangential)
+%---------- Hardware Components (electric propulsion)
 %----------------------------------------
 
-Create ImpulsiveBurn BurnSSO1;
-BurnSSO1.CoordinateSystem  = Local;
-BurnSSO1.Origin            = Earth;
-BurnSSO1.Axes              = VNB;
-BurnSSO1.Element1           = 0.0005;
-BurnSSO1.Element2           = 0;
-BurnSSO1.Element3           = 0;
-BurnSSO1.DecrementMass      = false;
-BurnSSO1.Isp                = 220;
-BurnSSO1.GravitationalAccel = 9.81;
+Create SolarPowerSystem SolarPowerSystemEO;
+SolarPowerSystemEO.EpochFormat     = 'UTCGregorian';
+SolarPowerSystemEO.InitialEpoch    = '01 Oct 2028 00:00:00.000';
+SolarPowerSystemEO.InitialMaxPower = 0.35;
+SolarPowerSystemEO.AnnualDecayRate = 2;
+SolarPowerSystemEO.Margin          = 5;
+SolarPowerSystemEO.BusCoeff1       = 0.3;
+SolarPowerSystemEO.BusCoeff2       = 0;
+SolarPowerSystemEO.BusCoeff3       = 0;
+SolarPowerSystemEO.ShadowModel     = 'DualCone';
+SolarPowerSystemEO.ShadowBodies    = {'Luna'};
+SolarPowerSystemEO.SolarCoeff1     = 1.32077;
+SolarPowerSystemEO.SolarCoeff2     = -0.10848;
+SolarPowerSystemEO.SolarCoeff3     = -0.11665;
+SolarPowerSystemEO.SolarCoeff4     = 0.10843;
+SolarPowerSystemEO.SolarCoeff5     = -0.01279;
 
-Create ImpulsiveBurn BurnSSO2;
-BurnSSO2.CoordinateSystem  = Local;
-BurnSSO2.Origin            = Earth;
-BurnSSO2.Axes              = VNB;
-BurnSSO2.Element1           = 0.0005;
-BurnSSO2.Element2           = 0;
-BurnSSO2.Element3           = 0;
-BurnSSO2.DecrementMass      = false;
-BurnSSO2.Isp                = 220;
-BurnSSO2.GravitationalAccel = 9.81;
+Create ElectricTank ElectricTank_SSO1;
+ElectricTank_SSO1.AllowNegativeFuelMass = false;
+ElectricTank_SSO1.FuelMass              = 6;
 
-Create ImpulsiveBurn BurnMid3;
-BurnMid3.CoordinateSystem  = Local;
-BurnMid3.Origin            = Earth;
-BurnMid3.Axes              = VNB;
-BurnMid3.Element1           = 0.0005;
-BurnMid3.Element2           = 0;
-BurnMid3.Element3           = 0;
-BurnMid3.DecrementMass      = false;
-BurnMid3.Isp                = 220;
-BurnMid3.GravitationalAccel = 9.81;
+Create ElectricThruster ElectricThruster_SSO1_Pro;
+ElectricThruster_SSO1_Pro.CoordinateSystem   = Local;
+ElectricThruster_SSO1_Pro.Origin             = Earth;
+ElectricThruster_SSO1_Pro.Axes               = VNB;
+ElectricThruster_SSO1_Pro.ThrustDirection1   = 1;
+ElectricThruster_SSO1_Pro.ThrustDirection2   = 0;
+ElectricThruster_SSO1_Pro.ThrustDirection3   = 0;
+ElectricThruster_SSO1_Pro.DutyCycle          = 1;
+ElectricThruster_SSO1_Pro.ThrustScaleFactor  = 1;
+ElectricThruster_SSO1_Pro.DecrementMass      = true;
+ElectricThruster_SSO1_Pro.Tank               = {ElectricTank_SSO1};
+ElectricThruster_SSO1_Pro.MixRatio           = [1];
+ElectricThruster_SSO1_Pro.GravitationalAccel = 9.81;
+ElectricThruster_SSO1_Pro.ThrustModel        = ConstantThrustAndIsp;
+ElectricThruster_SSO1_Pro.MaximumUsablePower = 0.4;
+ElectricThruster_SSO1_Pro.MinimumUsablePower = 0.05;
+ElectricThruster_SSO1_Pro.Isp                = 1500;
+ElectricThruster_SSO1_Pro.ConstantThrust     = 0.01;
 
-Create ImpulsiveBurn BurnPhase;
-BurnPhase.CoordinateSystem  = Local;
-BurnPhase.Origin            = Earth;
-BurnPhase.Axes              = VNB;
-BurnPhase.Element1           = 0.00005;
-BurnPhase.Element2           = 0;
-BurnPhase.Element3           = 0;
-BurnPhase.DecrementMass      = false;
-BurnPhase.Isp                = 220;
-BurnPhase.GravitationalAccel = 9.81;
+Create ElectricTank ElectricTank_SSO2;
+ElectricTank_SSO2.AllowNegativeFuelMass = false;
+ElectricTank_SSO2.FuelMass              = 6;
+
+Create ElectricThruster ElectricThruster_SSO2_Pro;
+ElectricThruster_SSO2_Pro.CoordinateSystem   = Local;
+ElectricThruster_SSO2_Pro.Origin             = Earth;
+ElectricThruster_SSO2_Pro.Axes               = VNB;
+ElectricThruster_SSO2_Pro.ThrustDirection1   = 1;
+ElectricThruster_SSO2_Pro.ThrustDirection2   = 0;
+ElectricThruster_SSO2_Pro.ThrustDirection3   = 0;
+ElectricThruster_SSO2_Pro.DutyCycle          = 1;
+ElectricThruster_SSO2_Pro.ThrustScaleFactor  = 1;
+ElectricThruster_SSO2_Pro.DecrementMass      = true;
+ElectricThruster_SSO2_Pro.Tank               = {ElectricTank_SSO2};
+ElectricThruster_SSO2_Pro.MixRatio           = [1];
+ElectricThruster_SSO2_Pro.GravitationalAccel = 9.81;
+ElectricThruster_SSO2_Pro.ThrustModel        = ConstantThrustAndIsp;
+ElectricThruster_SSO2_Pro.MaximumUsablePower = 0.4;
+ElectricThruster_SSO2_Pro.MinimumUsablePower = 0.05;
+ElectricThruster_SSO2_Pro.Isp                = 1500;
+ElectricThruster_SSO2_Pro.ConstantThrust     = 0.01;
+
+% Reverse-facing thruster, shares SSO_Sat2's tank -- needed because a
+% phasing correction must be able to both raise AND lower the orbit
+% (see "SSO in-plane phasing" in the header), which a single fixed-
+% direction electric thruster cannot do.
+Create ElectricThruster ElectricThruster_SSO2_Retro;
+ElectricThruster_SSO2_Retro.CoordinateSystem   = Local;
+ElectricThruster_SSO2_Retro.Origin             = Earth;
+ElectricThruster_SSO2_Retro.Axes               = VNB;
+ElectricThruster_SSO2_Retro.ThrustDirection1   = -1;
+ElectricThruster_SSO2_Retro.ThrustDirection2   = 0;
+ElectricThruster_SSO2_Retro.ThrustDirection3   = 0;
+ElectricThruster_SSO2_Retro.DutyCycle          = 1;
+ElectricThruster_SSO2_Retro.ThrustScaleFactor  = 1;
+ElectricThruster_SSO2_Retro.DecrementMass      = true;
+ElectricThruster_SSO2_Retro.Tank               = {ElectricTank_SSO2};
+ElectricThruster_SSO2_Retro.MixRatio           = [1];
+ElectricThruster_SSO2_Retro.GravitationalAccel = 9.81;
+ElectricThruster_SSO2_Retro.ThrustModel        = ConstantThrustAndIsp;
+ElectricThruster_SSO2_Retro.MaximumUsablePower = 0.4;
+ElectricThruster_SSO2_Retro.MinimumUsablePower = 0.05;
+ElectricThruster_SSO2_Retro.Isp                = 1500;
+ElectricThruster_SSO2_Retro.ConstantThrust     = 0.01;
+
+Create ElectricTank ElectricTank_Mid3;
+ElectricTank_Mid3.AllowNegativeFuelMass = false;
+ElectricTank_Mid3.FuelMass              = 6;
+
+Create ElectricThruster ElectricThruster_Mid3_Pro;
+ElectricThruster_Mid3_Pro.CoordinateSystem   = Local;
+ElectricThruster_Mid3_Pro.Origin             = Earth;
+ElectricThruster_Mid3_Pro.Axes               = VNB;
+ElectricThruster_Mid3_Pro.ThrustDirection1   = 1;
+ElectricThruster_Mid3_Pro.ThrustDirection2   = 0;
+ElectricThruster_Mid3_Pro.ThrustDirection3   = 0;
+ElectricThruster_Mid3_Pro.DutyCycle          = 1;
+ElectricThruster_Mid3_Pro.ThrustScaleFactor  = 1;
+ElectricThruster_Mid3_Pro.DecrementMass      = true;
+ElectricThruster_Mid3_Pro.Tank               = {ElectricTank_Mid3};
+ElectricThruster_Mid3_Pro.MixRatio           = [1];
+ElectricThruster_Mid3_Pro.GravitationalAccel = 9.81;
+ElectricThruster_Mid3_Pro.ThrustModel        = ConstantThrustAndIsp;
+ElectricThruster_Mid3_Pro.MaximumUsablePower = 0.4;
+ElectricThruster_Mid3_Pro.MinimumUsablePower = 0.05;
+ElectricThruster_Mid3_Pro.Isp                = 1500;
+ElectricThruster_Mid3_Pro.ConstantThrust     = 0.01;
+
+%----------------------------------------
+%---------- Burns (finite, electric-propulsion)
+%----------------------------------------
+
+Create FiniteBurn FiniteBurn_SSO1_Pro;
+FiniteBurn_SSO1_Pro.Thrusters              = {ElectricThruster_SSO1_Pro};
+FiniteBurn_SSO1_Pro.ThrottleLogicAlgorithm = 'MaxNumberOfThrusters';
+
+Create FiniteBurn FiniteBurn_SSO2_Pro;
+FiniteBurn_SSO2_Pro.Thrusters              = {ElectricThruster_SSO2_Pro};
+FiniteBurn_SSO2_Pro.ThrottleLogicAlgorithm = 'MaxNumberOfThrusters';
+
+Create FiniteBurn FiniteBurn_SSO2_Retro;
+FiniteBurn_SSO2_Retro.Thrusters              = {ElectricThruster_SSO2_Retro};
+FiniteBurn_SSO2_Retro.ThrottleLogicAlgorithm = 'MaxNumberOfThrusters';
+
+Create FiniteBurn FiniteBurn_Mid3_Pro;
+FiniteBurn_Mid3_Pro.Thrusters              = {ElectricThruster_Mid3_Pro};
+FiniteBurn_Mid3_Pro.ThrottleLogicAlgorithm = 'MaxNumberOfThrusters';
 
 %----------------------------------------
 %---------- Solvers
@@ -267,11 +387,14 @@ MeanMotionDegPerDay = 5396.38;      % deg/day, n = sqrt(mu/a^3) at NominalSMA
 
 Create Variable PhaseError AbsPhaseError DeltaA PhaseTargetSMA;
 
-Create Variable DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase;
-DVBudget_SSO1  = 0;
-DVBudget_SSO2  = 0;
-DVBudget_Mid3  = 0;
-DVBudget_Phase = 0;
+Create Variable BurnDurationSSO1 BurnDurationSSO2 BurnDurationMid3;
+BurnDurationSSO1 = 82000;           % sec, initial guess (~1 day @ 10 mN/300 kg)
+BurnDurationSSO2 = 82000;
+BurnDurationMid3 = 82000;
+
+Create Variable PhaseBurnDuration1 PhaseBurnDuration2;
+PhaseBurnDuration1 = 1200;          % sec, initial guess for phasing burns
+PhaseBurnDuration2 = 1200;
 
 Create Variable ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
 ReboostCount_SSO1    = 0;
@@ -299,7 +422,7 @@ Mid3_Report.WriteHeaders = true;
 Mid3_Report.Precision    = 16;
 
 Create ReportFile Constellation_Report;
-Constellation_Report.Filename    = 'Constellation_PhaseAndDeltaV.txt';
+Constellation_Report.Filename    = 'Constellation_PhaseAndPropellant.txt';
 Constellation_Report.WriteHeaders = true;
 Constellation_Report.Precision    = 16;
 
@@ -342,9 +465,9 @@ AltitudeHistory.SolverIterations = None;
 BeginMissionSequence;
 
 % Initial state snapshot
-Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude;
-Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude;
-Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Earth.ECC MidInc_Sat3.INC MidInc_Sat3.RAAN MidInc_Sat3.AOP MidInc_Sat3.TA MidInc_Sat3.Earth.Altitude;
+Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude SSO_Sat1.ElectricTank_SSO1.FuelMass;
+Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude SSO_Sat2.ElectricTank_SSO2.FuelMass;
+Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Earth.ECC MidInc_Sat3.INC MidInc_Sat3.RAAN MidInc_Sat3.AOP MidInc_Sat3.TA MidInc_Sat3.Earth.Altitude MidInc_Sat3.ElectricTank_Mid3.FuelMass;
 
 While SSO_Sat1.ElapsedDays < MissionDurationDays
 
@@ -352,9 +475,9 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
    Propagate 'DailyStep' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = StepSizeDays};
 
    % ---- Orbit history logging ----
-   Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude;
-   Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude;
-   Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Earth.ECC MidInc_Sat3.INC MidInc_Sat3.RAAN MidInc_Sat3.AOP MidInc_Sat3.TA MidInc_Sat3.Earth.Altitude;
+   Report SSO1_Report SSO_Sat1.UTCGregorian SSO_Sat1.Earth.SMA SSO_Sat1.Earth.ECC SSO_Sat1.INC SSO_Sat1.RAAN SSO_Sat1.AOP SSO_Sat1.TA SSO_Sat1.Earth.Altitude SSO_Sat1.ElectricTank_SSO1.FuelMass;
+   Report SSO2_Report SSO_Sat2.UTCGregorian SSO_Sat2.Earth.SMA SSO_Sat2.Earth.ECC SSO_Sat2.INC SSO_Sat2.RAAN SSO_Sat2.AOP SSO_Sat2.TA SSO_Sat2.Earth.Altitude SSO_Sat2.ElectricTank_SSO2.FuelMass;
+   Report Mid3_Report MidInc_Sat3.UTCGregorian MidInc_Sat3.Earth.SMA MidInc_Sat3.Earth.ECC MidInc_Sat3.INC MidInc_Sat3.RAAN MidInc_Sat3.AOP MidInc_Sat3.TA MidInc_Sat3.Earth.Altitude MidInc_Sat3.ElectricTank_Mid3.FuelMass;
 
    % ==================================================================
    % 1) ALTITUDE / SMA STATION-KEEPING -- one independent check per sat
@@ -362,31 +485,34 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
 
    If SSO_Sat1.Earth.Altitude < AltLowerBoundAlt
       Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
-         Vary DCStation(BurnSSO1.Element1 = 0.0005, {Perturbation = 0.0001, Lower = 0.0, Upper = 0.05, MaxStep = 0.0005});
-         Maneuver BurnSSO1(SSO_Sat1);
+         Vary DCStation(BurnDurationSSO1 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
+         BeginFiniteBurn FiniteBurn_SSO1_Pro(SSO_Sat1);
+         Propagate 'SK Burn SSO1' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedSecs = BurnDurationSSO1};
+         EndFiniteBurn FiniteBurn_SSO1_Pro(SSO_Sat1);
          Achieve DCStation(SSO_Sat1.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
-      DVBudget_SSO1 = DVBudget_SSO1 + abs(BurnSSO1.Element1) * 1000;
       ReboostCount_SSO1 = ReboostCount_SSO1 + 1;
    EndIf;
 
    If SSO_Sat2.Earth.Altitude < AltLowerBoundAlt
       Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
-         Vary DCStation(BurnSSO2.Element1 = 0.0005, {Perturbation = 0.0001, Lower = 0.0, Upper = 0.05, MaxStep = 0.0005});
-         Maneuver BurnSSO2(SSO_Sat2);
+         Vary DCStation(BurnDurationSSO2 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
+         BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
+         Propagate 'SK Burn SSO2' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = BurnDurationSSO2};
+         EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
          Achieve DCStation(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
-      DVBudget_SSO2 = DVBudget_SSO2 + abs(BurnSSO2.Element1) * 1000;
       ReboostCount_SSO2 = ReboostCount_SSO2 + 1;
    EndIf;
 
    If MidInc_Sat3.Earth.Altitude < AltLowerBoundAlt
       Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
-         Vary DCStation(BurnMid3.Element1 = 0.0005, {Perturbation = 0.0001, Lower = 0.0, Upper = 0.05, MaxStep = 0.0005});
-         Maneuver BurnMid3(MidInc_Sat3);
+         Vary DCStation(BurnDurationMid3 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
+         BeginFiniteBurn FiniteBurn_Mid3_Pro(MidInc_Sat3);
+         Propagate 'SK Burn Mid3' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {MidInc_Sat3.ElapsedSecs = BurnDurationMid3};
+         EndFiniteBurn FiniteBurn_Mid3_Pro(MidInc_Sat3);
          Achieve DCStation(MidInc_Sat3.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
-      DVBudget_Mid3 = DVBudget_Mid3 + abs(BurnMid3.Element1) * 1000;
       ReboostCount_Mid3 = ReboostCount_Mid3 + 1;
    EndIf;
 
@@ -417,29 +543,54 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
          PhaseTargetSMA = NominalSMA + DeltaA;
 
          % --- Burn 1: open the drift orbit on SSO_Sat2 ---
-         Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
-            Vary DCPhase(BurnPhase.Element1 = 0.00005, {Perturbation = 0.000005, Lower = -0.01, Upper = 0.01, MaxStep = 0.00005});
-            Maneuver BurnPhase(SSO_Sat2);
-            Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
-         EndTarget;
-         DVBudget_Phase = DVBudget_Phase + abs(BurnPhase.Element1) * 1000;
+         % DeltaA > 0 needs the prograde (raise) thruster; DeltaA < 0 needs
+         % the retrograde (lower) thruster. Burn 2 always uses whichever
+         % thruster burn 1 did not, since it undoes the SMA offset.
+         If DeltaA > 0
+            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
+               Propagate 'Phase Burn 1 (raise)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
+               EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
+               Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
+            EndTarget;
+         Else
+            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
+               Propagate 'Phase Burn 1 (lower)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
+               EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
+               Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
+            EndTarget;
+         EndIf;
 
          % --- Let the phase drift for DriftDays (synchronized propagation) ---
          Propagate 'PhaseDrift' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedDays = DriftDays};
 
          % --- Burn 2: restore nominal altitude, locking in the corrected phase ---
-         Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
-            Vary DCPhase(BurnPhase.Element1 = -0.00005, {Perturbation = 0.000005, Lower = -0.01, Upper = 0.01, MaxStep = 0.00005});
-            Maneuver BurnPhase(SSO_Sat2);
-            Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
-         EndTarget;
-         DVBudget_Phase = DVBudget_Phase + abs(BurnPhase.Element1) * 1000;
+         If DeltaA > 0
+            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
+               Propagate 'Phase Burn 2 (restore)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
+               EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
+               Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
+            EndTarget;
+         Else
+            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+               BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
+               Propagate 'Phase Burn 2 (restore)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
+               EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
+               Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
+            EndTarget;
+         EndIf;
 
          PhaseCorrectionCount = PhaseCorrectionCount + 1;
 
       EndIf;
 
-      Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
+      Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA SSO_Sat1.ElectricTank_SSO1.FuelMass SSO_Sat2.ElectricTank_SSO2.FuelMass MidInc_Sat3.ElectricTank_Mid3.FuelMass ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
 
       NextPhaseCheckDay = NextPhaseCheckDay + PhaseCheckIntervalDays;
 
@@ -448,4 +599,4 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
 EndWhile;
 
 % ---- Final mission summary ----
-Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA DVBudget_SSO1 DVBudget_SSO2 DVBudget_Mid3 DVBudget_Phase ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
+Report Constellation_Report SSO_Sat1.UTCGregorian PhaseError DeltaA SSO_Sat1.ElectricTank_SSO1.FuelMass SSO_Sat2.ElectricTank_SSO2.FuelMass MidInc_Sat3.ElectricTank_Mid3.FuelMass ReboostCount_SSO1 ReboostCount_SSO2 ReboostCount_Mid3 PhaseCorrectionCount;
