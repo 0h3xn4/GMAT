@@ -95,6 +95,15 @@
 %      an impulsive-burn version -- expect a long run for the full 5-year,
 %      3-spacecraft case. Consider running headless (no GUI plots) for the
 %      full-duration production run.
+%    - GMAT does not allow more than one Spacecraft in a single Propagator
+%      clause while a FiniteBurn is active on any of them ("Multiple
+%      Spacecraft are not allowed in a propagator driving a finite burn").
+%      Every Propagate command that brackets a BeginFiniteBurn/EndFiniteBurn
+%      pair therefore uses the "Synchronized Prop(Sat1) Prop(Sat2) Prop(Sat3)"
+%      form (one Propagator clause per spacecraft, time-synchronized) instead
+%      of the simpler "Prop(Sat1, Sat2, Sat3)" form. The pure-coast
+%      propagations (DailyStep, PhaseDrift), where no burn is active, keep
+%      the simpler multi-spacecraft-per-Propagator form.
 %  ===========================================================================
 %----------------------------------------------------------------------------
 
@@ -485,7 +494,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
       Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
          Vary DCStation(BurnDurationSSO1 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
          BeginFiniteBurn FiniteBurn_SSO1_Pro(SSO_Sat1);
-         Propagate 'SK Burn SSO1' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat1.ElapsedSecs = BurnDurationSSO1};
+         Propagate 'SK Burn SSO1' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat1.ElapsedSecs = BurnDurationSSO1};
          EndFiniteBurn FiniteBurn_SSO1_Pro(SSO_Sat1);
          Achieve DCStation(SSO_Sat1.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
@@ -496,7 +505,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
       Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
          Vary DCStation(BurnDurationSSO2 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
          BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-         Propagate 'SK Burn SSO2' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = BurnDurationSSO2};
+         Propagate 'SK Burn SSO2' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = BurnDurationSSO2};
          EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
          Achieve DCStation(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
@@ -507,7 +516,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
       Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
          Vary DCStation(BurnDurationMid3 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
          BeginFiniteBurn FiniteBurn_Mid3_Pro(MidInc_Sat3);
-         Propagate 'SK Burn Mid3' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {MidInc_Sat3.ElapsedSecs = BurnDurationMid3};
+         Propagate 'SK Burn Mid3' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {MidInc_Sat3.ElapsedSecs = BurnDurationMid3};
          EndFiniteBurn FiniteBurn_Mid3_Pro(MidInc_Sat3);
          Achieve DCStation(MidInc_Sat3.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
@@ -548,7 +557,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
             Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
                Vary DCPhase(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-               Propagate 'Phase Burn 1 (raise)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
+               Propagate 'Phase Burn 1 (raise)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
                EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
                Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
             EndTarget;
@@ -556,7 +565,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
             Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
                Vary DCPhase(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
-               Propagate 'Phase Burn 1 (lower)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
+               Propagate 'Phase Burn 1 (lower)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
                EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
                Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
             EndTarget;
@@ -570,7 +579,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
             Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
                Vary DCPhase(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
-               Propagate 'Phase Burn 2 (restore)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
+               Propagate 'Phase Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
                EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
                Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
             EndTarget;
@@ -578,7 +587,7 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
             Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
                Vary DCPhase(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-               Propagate 'Phase Burn 2 (restore)' Prop(SSO_Sat1, SSO_Sat2, MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
+               Propagate 'Phase Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
                EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
                Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
             EndTarget;
