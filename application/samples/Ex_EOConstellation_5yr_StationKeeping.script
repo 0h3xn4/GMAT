@@ -393,15 +393,43 @@ FiniteBurn_Mid3_Pro.ThrottleLogicAlgorithm = 'MaxNumberOfThrusters';
 %---------- Solvers
 %----------------------------------------
 
-Create DifferentialCorrector DCStation;
-DCStation.ShowProgress       = false;
-DCStation.MaximumIterations  = 25;
-DCStation.DerivativeMethod   = ForwardDifference;
+% NOTE: GMAT's DifferentialCorrector registers every Vary/Achieve pair
+% that names it, ANYWHERE in the script, into one fixed internal list at
+% parse time; each Target block resets its solve counter to 0 but reuses
+% that same fixed list, so a solver can only be reused across multiple
+% Target blocks if every one of them varies/achieves the exact same
+% variable/goal. Different solve-for variables or goals need their own
+% DifferentialCorrector, or GMAT throws "Mismatch between parsed and
+% configured variable/goal". Hence one DC per distinct burn below.
 
-Create DifferentialCorrector DCPhase;
-DCPhase.ShowProgress         = false;
-DCPhase.MaximumIterations    = 25;
-DCPhase.DerivativeMethod     = ForwardDifference;
+Create DifferentialCorrector DCStation_SSO1;
+DCStation_SSO1.ShowProgress       = false;
+DCStation_SSO1.MaximumIterations  = 25;
+DCStation_SSO1.DerivativeMethod   = ForwardDifference;
+
+Create DifferentialCorrector DCStation_SSO2;
+DCStation_SSO2.ShowProgress       = false;
+DCStation_SSO2.MaximumIterations  = 25;
+DCStation_SSO2.DerivativeMethod   = ForwardDifference;
+
+Create DifferentialCorrector DCStation_Mid3;
+DCStation_Mid3.ShowProgress       = false;
+DCStation_Mid3.MaximumIterations  = 25;
+DCStation_Mid3.DerivativeMethod   = ForwardDifference;
+
+% DCPhase1 is shared by Burn 1's If/Else branches (both vary
+% PhaseBurnDuration1 and achieve SSO_Sat2.Earth.SMA = PhaseTargetSMA --
+% same variable/goal in both branches, so reuse is safe). DCPhase2 is
+% the same for Burn 2 (PhaseBurnDuration2 / NominalSMA).
+Create DifferentialCorrector DCPhase1;
+DCPhase1.ShowProgress         = false;
+DCPhase1.MaximumIterations    = 25;
+DCPhase1.DerivativeMethod     = ForwardDifference;
+
+Create DifferentialCorrector DCPhase2;
+DCPhase2.ShowProgress         = false;
+DCPhase2.MaximumIterations    = 25;
+DCPhase2.DerivativeMethod     = ForwardDifference;
 
 %----------------------------------------
 %---------- Mission parameters (Variables)
@@ -527,34 +555,34 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
    % ==================================================================
 
    If SSO_Sat1.Earth.Altitude < AltLowerBoundAlt
-      Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
-         Vary DCStation(BurnDurationSSO1 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
+      Target DCStation_SSO1 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+         Vary DCStation_SSO1(BurnDurationSSO1 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
          BeginFiniteBurn FiniteBurn_SSO1_Pro(SSO_Sat1);
          Propagate 'SK Burn SSO1' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat1.ElapsedSecs = BurnDurationSSO1};
          EndFiniteBurn FiniteBurn_SSO1_Pro(SSO_Sat1);
-         Achieve DCStation(SSO_Sat1.Earth.SMA = NominalSMA, {Tolerance = 0.1});
+         Achieve DCStation_SSO1(SSO_Sat1.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
       ReboostCount_SSO1 = ReboostCount_SSO1 + 1;
    EndIf;
 
    If SSO_Sat2.Earth.Altitude < AltLowerBoundAlt
-      Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
-         Vary DCStation(BurnDurationSSO2 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
+      Target DCStation_SSO2 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+         Vary DCStation_SSO2(BurnDurationSSO2 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
          BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
          Propagate 'SK Burn SSO2' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = BurnDurationSSO2};
          EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-         Achieve DCStation(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.1});
+         Achieve DCStation_SSO2(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
       ReboostCount_SSO2 = ReboostCount_SSO2 + 1;
    EndIf;
 
    If MidInc_Sat3.Earth.Altitude < AltLowerBoundAlt
-      Target DCStation {SolveMode = Solve, ExitMode = DiscardAndContinue};
-         Vary DCStation(BurnDurationMid3 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
+      Target DCStation_Mid3 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+         Vary DCStation_Mid3(BurnDurationMid3 = 82000, {Perturbation = 100, Lower = 0.0, Upper = 300000, MaxStep = 20000});
          BeginFiniteBurn FiniteBurn_Mid3_Pro(MidInc_Sat3);
          Propagate 'SK Burn Mid3' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {MidInc_Sat3.ElapsedSecs = BurnDurationMid3};
          EndFiniteBurn FiniteBurn_Mid3_Pro(MidInc_Sat3);
-         Achieve DCStation(MidInc_Sat3.Earth.SMA = NominalSMA, {Tolerance = 0.1});
+         Achieve DCStation_Mid3(MidInc_Sat3.Earth.SMA = NominalSMA, {Tolerance = 0.1});
       EndTarget;
       ReboostCount_Mid3 = ReboostCount_Mid3 + 1;
    EndIf;
@@ -590,20 +618,20 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
          % the retrograde (lower) thruster. Burn 2 always uses whichever
          % thruster burn 1 did not, since it undoes the SMA offset.
          If DeltaA > 0
-            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+            Target DCPhase1 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase1(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
                Propagate 'Phase Burn 1 (raise)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
                EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-               Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
+               Achieve DCPhase1(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
             EndTarget;
          Else
-            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+            Target DCPhase1 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase1(PhaseBurnDuration1 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
                Propagate 'Phase Burn 1 (lower)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration1};
                EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
-               Achieve DCPhase(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
+               Achieve DCPhase1(SSO_Sat2.Earth.SMA = PhaseTargetSMA, {Tolerance = 0.001});
             EndTarget;
          EndIf;
 
@@ -612,20 +640,20 @@ While SSO_Sat1.ElapsedDays < MissionDurationDays
 
          % --- Burn 2: restore nominal altitude, locking in the corrected phase ---
          If DeltaA > 0
-            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+            Target DCPhase2 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase2(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
                Propagate 'Phase Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
                EndFiniteBurn FiniteBurn_SSO2_Retro(SSO_Sat2);
-               Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
+               Achieve DCPhase2(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
             EndTarget;
          Else
-            Target DCPhase {SolveMode = Solve, ExitMode = DiscardAndContinue};
-               Vary DCPhase(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
+            Target DCPhase2 {SolveMode = Solve, ExitMode = DiscardAndContinue};
+               Vary DCPhase2(PhaseBurnDuration2 = 1200, {Perturbation = 10, Lower = 0.0, Upper = 300000, MaxStep = 3600});
                BeginFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
                Propagate 'Phase Burn 2 (restore)' Synchronized Prop(SSO_Sat1) Prop(SSO_Sat2) Prop(MidInc_Sat3) {SSO_Sat2.ElapsedSecs = PhaseBurnDuration2};
                EndFiniteBurn FiniteBurn_SSO2_Pro(SSO_Sat2);
-               Achieve DCPhase(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
+               Achieve DCPhase2(SSO_Sat2.Earth.SMA = NominalSMA, {Tolerance = 0.001});
             EndTarget;
          EndIf;
 
