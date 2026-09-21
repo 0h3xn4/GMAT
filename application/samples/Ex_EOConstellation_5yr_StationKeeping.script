@@ -569,6 +569,76 @@ ReboostCount_Mid3    = 0;
 PhaseCorrectionCount = 0;
 
 %----------------------------------------
+%---------- GroundStations
+%----------------------------------------
+
+% PLACEHOLDER -- replace Location1/2/3 with your actual downlink site.
+% Sited here at SSC Kiruna, Sweden (67.86N, 20.97E), a real high-latitude
+% ground station widely used for SSO/EO missions, chosen because it sees
+% nearly every SSO_Sat1/SSO_Sat2 pass (their orbit carries the ground track
+% through all latitudes up to ~98 deg). MidInc_Sat3's ground track never
+% exceeds 53 deg latitude, so its passes over this single high-latitude
+% site will be less frequent and lower-elevation than the SSO passes; a
+% real mixed-inclination constellation would normally add a second, lower-
+% latitude station to serve Mid3 well.
+Create GroundStation GroundStation1;
+GroundStation1.CentralBody           = Earth;
+GroundStation1.StateType             = Spherical;
+GroundStation1.HorizonReference      = Ellipsoid;
+GroundStation1.Location1             = 67.857527;   % Latitude, deg
+GroundStation1.Location2             = 20.966096;   % Longitude, deg East
+GroundStation1.Location3             = 0.408;       % Altitude, km
+GroundStation1.MinimumElevationAngle = 5;           % deg
+GroundStation1.Id                    = 'GroundStation1';
+
+%----------------------------------------
+%---------- Event Locators
+%----------------------------------------
+
+% One ContactLocator per satellite (ContactLocator.Target takes a single
+% spacecraft). Each searches the whole mission for line-of-sight windows
+% to GroundStation1 and writes a text report with pass start/stop times,
+% duration, and maximum elevation -- the authoritative record of ground-
+% station contact. Light-time delay is disabled: at LEO ranges (<3000 km)
+% it is well under a hundredth of a second and irrelevant for link
+% visualization/scheduling.
+Create ContactLocator ContactLocator_SSO1;
+ContactLocator_SSO1.Target               = SSO_Sat1;
+ContactLocator_SSO1.Observers            = {GroundStation1};
+ContactLocator_SSO1.Filename             = 'SSO1_GroundContacts.txt';
+ContactLocator_SSO1.ReportFormat         = SiteViewMaxElevationReport;
+ContactLocator_SSO1.StepSize             = 60;
+ContactLocator_SSO1.UseLightTimeDelay    = false;
+ContactLocator_SSO1.UseStellarAberration = false;
+ContactLocator_SSO1.UseEntireInterval    = true;
+ContactLocator_SSO1.RunMode              = Automatic;
+ContactLocator_SSO1.WriteReport          = true;
+
+Create ContactLocator ContactLocator_SSO2;
+ContactLocator_SSO2.Target               = SSO_Sat2;
+ContactLocator_SSO2.Observers            = {GroundStation1};
+ContactLocator_SSO2.Filename             = 'SSO2_GroundContacts.txt';
+ContactLocator_SSO2.ReportFormat         = SiteViewMaxElevationReport;
+ContactLocator_SSO2.StepSize             = 60;
+ContactLocator_SSO2.UseLightTimeDelay    = false;
+ContactLocator_SSO2.UseStellarAberration = false;
+ContactLocator_SSO2.UseEntireInterval    = true;
+ContactLocator_SSO2.RunMode              = Automatic;
+ContactLocator_SSO2.WriteReport          = true;
+
+Create ContactLocator ContactLocator_Mid3;
+ContactLocator_Mid3.Target               = MidInc_Sat3;
+ContactLocator_Mid3.Observers            = {GroundStation1};
+ContactLocator_Mid3.Filename             = 'Mid3_GroundContacts.txt';
+ContactLocator_Mid3.ReportFormat         = SiteViewMaxElevationReport;
+ContactLocator_Mid3.StepSize             = 60;
+ContactLocator_Mid3.UseLightTimeDelay    = false;
+ContactLocator_Mid3.UseStellarAberration = false;
+ContactLocator_Mid3.UseEntireInterval    = true;
+ContactLocator_Mid3.RunMode              = Automatic;
+ContactLocator_Mid3.WriteReport          = true;
+
+%----------------------------------------
 %---------- Subscribers
 %----------------------------------------
 
@@ -621,6 +691,21 @@ AltitudeHistory.YVariables = {SSO_Sat1.Earth.Altitude, SSO_Sat2.Earth.Altitude, 
 AltitudeHistory.ShowGrid   = true;
 AltitudeHistory.ShowPlot   = true;
 AltitudeHistory.SolverIterations = None;
+
+% Ground-station link visualization. A literal 3D line from the station to
+% each satellite (e.g. via OpenFramesVector) was deliberately not used: it
+% would draw straight through the Earth whenever there is no real line of
+% sight, which is physically misleading for a "link" display. GroundStation
+% resources also cannot be added to OpenFramesInterface/OrbitView (Add only
+% accepts Spacecraft, CelestialBody, LibrationPoint, or Barycenter). Instead,
+% the ground track plot below shows the station marker and all three
+% satellite ground tracks together, so passes over the station are visible
+% geometrically, while the ContactLocators above generate the authoritative
+% (non-visual) record of every real contact window and its max elevation.
+Create GroundTrackPlot ConstellationGroundTrack;
+ConstellationGroundTrack.Add             = {SSO_Sat1, SSO_Sat2, MidInc_Sat3, GroundStation1};
+ConstellationGroundTrack.ShowPlot        = true;
+ConstellationGroundTrack.SolverIterations = None;
 
 
 %----------------------------------------

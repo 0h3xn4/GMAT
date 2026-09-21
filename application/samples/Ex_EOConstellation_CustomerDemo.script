@@ -437,6 +437,63 @@ PhaseCorrectionCount = 0;
 Create String DemoMsg;
 
 %----------------------------------------
+%---------- GroundStations
+%----------------------------------------
+
+% PLACEHOLDER -- replace Location1/2/3 with your actual downlink site.
+% Sited here at SSC Kiruna, Sweden (67.86N, 20.97E); see the production
+% script for the full siting rationale (it applies unchanged here).
+Create GroundStation GroundStation1;
+GroundStation1.CentralBody           = Earth;
+GroundStation1.StateType             = Spherical;
+GroundStation1.HorizonReference      = Ellipsoid;
+GroundStation1.Location1             = 67.857527;   % Latitude, deg
+GroundStation1.Location2             = 20.966096;   % Longitude, deg East
+GroundStation1.Location3             = 0.408;       % Altitude, km
+GroundStation1.MinimumElevationAngle = 5;           % deg
+GroundStation1.Id                    = 'GroundStation1';
+
+%----------------------------------------
+%---------- Event Locators
+%----------------------------------------
+
+Create ContactLocator ContactLocator_SSO1;
+ContactLocator_SSO1.Target               = SSO_Sat1;
+ContactLocator_SSO1.Observers            = {GroundStation1};
+ContactLocator_SSO1.Filename             = 'Demo_SSO1_GroundContacts.txt';
+ContactLocator_SSO1.ReportFormat         = SiteViewMaxElevationReport;
+ContactLocator_SSO1.StepSize             = 60;
+ContactLocator_SSO1.UseLightTimeDelay    = false;
+ContactLocator_SSO1.UseStellarAberration = false;
+ContactLocator_SSO1.UseEntireInterval    = true;
+ContactLocator_SSO1.RunMode              = Automatic;
+ContactLocator_SSO1.WriteReport          = true;
+
+Create ContactLocator ContactLocator_SSO2;
+ContactLocator_SSO2.Target               = SSO_Sat2;
+ContactLocator_SSO2.Observers            = {GroundStation1};
+ContactLocator_SSO2.Filename             = 'Demo_SSO2_GroundContacts.txt';
+ContactLocator_SSO2.ReportFormat         = SiteViewMaxElevationReport;
+ContactLocator_SSO2.StepSize             = 60;
+ContactLocator_SSO2.UseLightTimeDelay    = false;
+ContactLocator_SSO2.UseStellarAberration = false;
+ContactLocator_SSO2.UseEntireInterval    = true;
+ContactLocator_SSO2.RunMode              = Automatic;
+ContactLocator_SSO2.WriteReport          = true;
+
+Create ContactLocator ContactLocator_Mid3;
+ContactLocator_Mid3.Target               = MidInc_Sat3;
+ContactLocator_Mid3.Observers            = {GroundStation1};
+ContactLocator_Mid3.Filename             = 'Demo_Mid3_GroundContacts.txt';
+ContactLocator_Mid3.ReportFormat         = SiteViewMaxElevationReport;
+ContactLocator_Mid3.StepSize             = 60;
+ContactLocator_Mid3.UseLightTimeDelay    = false;
+ContactLocator_Mid3.UseStellarAberration = false;
+ContactLocator_Mid3.UseEntireInterval    = true;
+ContactLocator_Mid3.RunMode              = Automatic;
+ContactLocator_Mid3.WriteReport          = true;
+
+%----------------------------------------
 %---------- Subscribers
 %----------------------------------------
 
@@ -496,6 +553,15 @@ AltitudeHistory.YVariables = {SSO_Sat1.Earth.Altitude, SSO_Sat2.Earth.Altitude, 
 AltitudeHistory.ShowGrid   = true;
 AltitudeHistory.ShowPlot   = true;
 AltitudeHistory.SolverIterations = None;
+
+% Ground-station link visualization -- see the production script for why
+% this uses a ground track (station + satellite tracks together) instead
+% of a literal 3D line, which would draw through the Earth when there is
+% no real line of sight.
+Create GroundTrackPlot ConstellationGroundTrack;
+ConstellationGroundTrack.Add             = {SSO_Sat1, SSO_Sat2, MidInc_Sat3, GroundStation1};
+ConstellationGroundTrack.ShowPlot        = true;
+ConstellationGroundTrack.SolverIterations = None;
 
 
 %----------------------------------------
