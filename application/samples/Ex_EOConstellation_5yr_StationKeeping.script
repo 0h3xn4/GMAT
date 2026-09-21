@@ -38,13 +38,29 @@
 %                              Re-solve precisely in GMAT (Sun RA report) or
 %                              with a dedicated LTAN targeter once the actual
 %                              launch epoch is fixed.
-%    - SSO in-plane phasing  : Sat1/Sat2 separated by 180 deg in true
+%    - SSO in-plane phasing  : Sat1/Sat2 separated by 180 deg in mean
 %                              anomaly (opposite sides of the shared plane)
 %                              for even ground-track distribution. Adjust to
 %                              the mission's actual revisit/coverage design.
-%    - Mid-inclination plane : RAAN = 0 deg, TA = 0 deg are placeholders --
+%    - Mid-inclination plane : RAAN = 0 deg, MA = 0 deg are placeholders --
 %                              select based on the target coverage band /
 %                              longitude of interest.
+%    - Orbit state input     : all 3 spacecraft are defined with
+%                              DisplayStateType = BrouwerMeanShort rather
+%                              than osculating Keplerian elements. This is
+%                              also the more physically consistent choice
+%                              here: the SSO inclination and frozen-orbit
+%                              eccentricity formulas above are themselves
+%                              mean-element (secular J2/J3) results, so
+%                              entering them as Brouwer mean elements avoids
+%                              the small J2 short-period offset (a few km in
+%                              SMA, ~0.01 deg in inclination) that would
+%                              otherwise appear if they were entered as
+%                              osculating Keplerian elements. Runtime
+%                              monitoring/targeting later in the script
+%                              (Earth.SMA, Earth.Altitude, TA, ...) still
+%                              reports osculating values, as is standard for
+%                              propagation and station-keeping goals.
 %    - No inclination-control burns are budgeted: at 570 km, drag and SRP do
 %      not drive meaningful secular inclination drift over 5 years, so only
 %      in-plane (SMA/altitude) control is modeled. RAAN/LTAN stability for
@@ -63,13 +79,13 @@ Create Spacecraft SSO_Sat1;
 SSO_Sat1.DateFormat           = UTCGregorian;
 SSO_Sat1.Epoch                = '01 Jan 2027 00:00:00.000';
 SSO_Sat1.CoordinateSystem     = EarthMJ2000Eq;
-SSO_Sat1.DisplayStateType     = Keplerian;
-SSO_Sat1.SMA                  = 6948.137;
-SSO_Sat1.ECC                  = 0.0011;
-SSO_Sat1.INC                  = 97.6704;
-SSO_Sat1.RAAN                 = 78.73;
-SSO_Sat1.AOP                  = 90;
-SSO_Sat1.TA                   = 0;
+SSO_Sat1.DisplayStateType     = BrouwerMeanShort;
+SSO_Sat1.BrouwerShortSMA      = 6948.137;
+SSO_Sat1.BrouwerShortECC      = 0.0011;
+SSO_Sat1.BrouwerShortINC      = 97.6704;
+SSO_Sat1.BrouwerShortRAAN     = 78.73;
+SSO_Sat1.BrouwerShortAOP      = 90;
+SSO_Sat1.BrouwerShortMA       = 0;
 SSO_Sat1.DryMass              = 300;
 SSO_Sat1.Cd                   = 2.2;
 SSO_Sat1.Cr                   = 1.8;
@@ -82,13 +98,13 @@ Create Spacecraft SSO_Sat2;
 SSO_Sat2.DateFormat           = UTCGregorian;
 SSO_Sat2.Epoch                = '01 Jan 2027 00:00:00.000';
 SSO_Sat2.CoordinateSystem     = EarthMJ2000Eq;
-SSO_Sat2.DisplayStateType     = Keplerian;
-SSO_Sat2.SMA                  = 6948.137;
-SSO_Sat2.ECC                  = 0.0011;
-SSO_Sat2.INC                  = 97.6704;
-SSO_Sat2.RAAN                 = 78.73;
-SSO_Sat2.AOP                  = 90;
-SSO_Sat2.TA                   = 180;
+SSO_Sat2.DisplayStateType     = BrouwerMeanShort;
+SSO_Sat2.BrouwerShortSMA      = 6948.137;
+SSO_Sat2.BrouwerShortECC      = 0.0011;
+SSO_Sat2.BrouwerShortINC      = 97.6704;
+SSO_Sat2.BrouwerShortRAAN     = 78.73;
+SSO_Sat2.BrouwerShortAOP      = 90;
+SSO_Sat2.BrouwerShortMA       = 180;
 SSO_Sat2.DryMass              = 300;
 SSO_Sat2.Cd                   = 2.2;
 SSO_Sat2.Cr                   = 1.8;
@@ -101,13 +117,13 @@ Create Spacecraft MidInc_Sat3;
 MidInc_Sat3.DateFormat        = UTCGregorian;
 MidInc_Sat3.Epoch             = '01 Jan 2027 00:00:00.000';
 MidInc_Sat3.CoordinateSystem  = EarthMJ2000Eq;
-MidInc_Sat3.DisplayStateType  = Keplerian;
-MidInc_Sat3.SMA               = 6948.137;
-MidInc_Sat3.ECC               = 0;
-MidInc_Sat3.INC               = 53;
-MidInc_Sat3.RAAN              = 0;
-MidInc_Sat3.AOP               = 0;
-MidInc_Sat3.TA                = 0;
+MidInc_Sat3.DisplayStateType  = BrouwerMeanShort;
+MidInc_Sat3.BrouwerShortSMA   = 6948.137;
+MidInc_Sat3.BrouwerShortECC   = 0.001;
+MidInc_Sat3.BrouwerShortINC   = 53;
+MidInc_Sat3.BrouwerShortRAAN  = 0;
+MidInc_Sat3.BrouwerShortAOP   = 0;
+MidInc_Sat3.BrouwerShortMA    = 0;
 MidInc_Sat3.DryMass           = 300;
 MidInc_Sat3.Cd                = 2.2;
 MidInc_Sat3.Cr                = 1.8;
