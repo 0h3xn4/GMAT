@@ -137,6 +137,10 @@ Create ElectricTank Tank2;
 Tank2.AllowNegativeFuelMass = false;
 Tank2.FuelMass              = 1;
 
+% The out-of-plane thrusters fire along +/-Y, the default SecondDirection of GMAT
+% hardware, which makes it print a harmless 'collinear' message at start-up; the
+% SecondDirection is set to X to avoid that. It does not affect the thrust.
+%
 % Satellite 1: prograde tangential thruster and +N / -N out-of-plane thrusters.
 % Thrust directions are fixed in the VNB frame (V = velocity, N = orbit normal).
 % ConstantThrust is in Newton. It must match the ThrustN variable below.
@@ -164,6 +168,9 @@ FeepNp1.Axes               = VNB;
 FeepNp1.ThrustDirection1   = 0;
 FeepNp1.ThrustDirection2   = 1;
 FeepNp1.ThrustDirection3   = 0;
+FeepNp1.SecondDirectionX    = 1;
+FeepNp1.SecondDirectionY    = 0;
+FeepNp1.SecondDirectionZ    = 0;
 FeepNp1.DutyCycle          = 0;
 FeepNp1.DecrementMass      = true;
 FeepNp1.Tank               = {Tank1};
@@ -181,6 +188,9 @@ FeepNm1.Axes               = VNB;
 FeepNm1.ThrustDirection1   = 0;
 FeepNm1.ThrustDirection2   = -1;
 FeepNm1.ThrustDirection3   = 0;
+FeepNm1.SecondDirectionX    = 1;
+FeepNm1.SecondDirectionY    = 0;
+FeepNm1.SecondDirectionZ    = 0;
 FeepNm1.DutyCycle          = 0;
 FeepNm1.DecrementMass      = true;
 FeepNm1.Tank               = {Tank1};
@@ -216,6 +226,9 @@ FeepNp2.Axes               = VNB;
 FeepNp2.ThrustDirection1   = 0;
 FeepNp2.ThrustDirection2   = 1;
 FeepNp2.ThrustDirection3   = 0;
+FeepNp2.SecondDirectionX    = 1;
+FeepNp2.SecondDirectionY    = 0;
+FeepNp2.SecondDirectionZ    = 0;
 FeepNp2.DutyCycle          = 0;
 FeepNp2.DecrementMass      = true;
 FeepNp2.Tank               = {Tank2};
@@ -233,6 +246,9 @@ FeepNm2.Axes               = VNB;
 FeepNm2.ThrustDirection1   = 0;
 FeepNm2.ThrustDirection2   = -1;
 FeepNm2.ThrustDirection3   = 0;
+FeepNm2.SecondDirectionX    = 1;
+FeepNm2.SecondDirectionY    = 0;
+FeepNm2.SecondDirectionZ    = 0;
 FeepNm2.DutyCycle          = 0;
 FeepNm2.DecrementMass      = true;
 FeepNm2.Tank               = {Tank2};
