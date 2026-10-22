@@ -67,6 +67,7 @@
 %        TMin/TMax           : along-track separation extremes, km
 %        ANMin/ANMax         : normal-separation amplitude extremes, km
 %        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
+%        epMax               : largest epoch difference between the satellites, s
 %
 %  REFERENCE RESULTS (GMAT R2026a, 5 years, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
@@ -395,7 +396,7 @@ Create Variable dvT1 dvN1 dvT2 dvN2 dvTot mProp1 mProp2 dvRkt1 dvRkt2 m01 m02;
 Create Variable dutySumT1 dutySumT2 dutyMaxT1 dutyMaxT2 campCyc1 campCyc2;
 
 % Compliance statistics
-Create Variable TMin TMax ANMin ANMax RngMin dAMax1 dAMax2 nOutT nOutN nRel;
+Create Variable TMin TMax ANMin ANMax RngMin dAMax1 dAMax2 nOutT nOutN nRel dEp absEp epMax;
 
 %----------------------------------------
 %---------- Subscribers
@@ -542,6 +543,7 @@ dAMax2 = 0;
 nOutT = 0;
 nOutN = 0;
 nRel = 0;
+epMax = 0;
 m01 = Sat1.TotalMass;
 m02 = Sat2.TotalMass;
 
@@ -580,6 +582,13 @@ While finished == 0
    raanM2 = Sat2.EarthTOD.BrouwerShortRAAN;
    eM1    = Sat1.EarthTOD.BrouwerShortECC;
    eM2    = Sat2.EarthTOD.BrouwerShortECC;
+   % The satellites are propagated one after the other for the same time, so
+   % they are at the same epoch whenever the RTN state is read; epMax checks it.
+   dEp    = (Sat2.A1ModJulian - Sat1.A1ModJulian) * 86400;
+   absEp  = abs(dEp);
+   If absEp > epMax
+      epMax = absEp;
+   EndIf;
    Rrel   = Sat2.Sat1RTN.X;
    Trel   = Sat2.Sat1RTN.Y;
    Nrel   = Sat2.Sat1RTN.Z;
@@ -1110,4 +1119,4 @@ dutySumT2 = dutySumT2 / nCyc;
 
 Report SummaryReport MissionDays tDays nCyc dvT1 dvN1 dvT2 dvN2 dvTot dvRkt1 dvRkt2 mProp1 mProp2;
 Report SummaryReport dutySumT1 dutyMaxT1 dutySumT2 dutyMaxT2 campCyc1 campCyc2 dAMax1 dAMax2 nRel nOmEv;
-Report SummaryReport TMin TMax ANMin ANMax RngMin nOutT nOutN;
+Report SummaryReport TMin TMax ANMin ANMax RngMin nOutT nOutN epMax;
