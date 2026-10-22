@@ -1,0 +1,990 @@
+%
+%  Ex_FormationFlying_SSO_FEEP
+%
+%  Delta-V budget for a two-satellite formation in a sun-synchronous orbit
+%  (SSO) over 5 years, with FEEP (field emission electric propulsion)
+%  thrusters. FEEP can only fire continuously at low thrust, so there are no
+%  impulsive burns anywhere in this script: every manoeuvre is a finite burn,
+%  throttled with the thruster DutyCycle and held for a whole control cycle.
+%
+%  FORMATION REQUIREMENT (RTN frame centred on Sat1, Sat2 relative to Sat1)
+%     Along-track (T) separation :  50 ... 1000 km
+%     Normal (N) separation      :  200 km (amplitude, see below)
+%
+%  The normal separation is created with a RAAN (LTAN) offset between the two
+%  planes, NOT with an inclination difference. Both satellites have the same
+%  a, e, i, so their J2 nodal precession is identical (both are sun-
+%  synchronous) and the offset is passively stable. A constant 200 km N offset
+%  is not possible in orbit, so "200 km normal" is taken as the amplitude of
+%  the N component, which swings +/-200 km over each orbit:
+%        A_N = a * sqrt( di^2 + (sin(i) * dRAAN)^2 )  =  NAmp
+%
+%  ASSUMPTIONS (all editable below)
+%     600 km circular SSO, LTAN 10:30, start 01 Jan 2027, 5 years (1826 days)
+%     2 identical 51 kg satellites (50 kg dry + 1 kg propellant), Cd 2.2;
+%     Sat2 has 10 % more drag area (0.55 vs 0.5 m^2) to exercise the
+%     differential-drag control
+%     FEEP: 1 mN per thruster, Isp 3000 s, one prograde and two out-of-plane
+%     (+N / -N) thrusters per satellite, power never limits thrust
+%     Gravity 8x8, Sun + Moon, SRP, NRLMSISE-00 drag with the Schatten
+%     nominal solar-cycle prediction
+%     The satellites start in their formation slots (launcher / acquisition
+%     manoeuvres are not in the budget)
+%
+%  CONTROL (one cycle = 15 orbits, about 1.009 day)
+%     1. Altitude : each satellite tracks a target mean SMA with a PI law on
+%                   continuous prograde thrust (drag make-up; the integral
+%                   term learns the drag acceleration).
+%     2. Along-track : when T leaves [TLow, THigh] a drift back towards the
+%                   centre is commanded, then stopped at TCenter. Drift rate
+%                   is measured from T, and the SMA offset needed to get the
+%                   commanded rate is split between the satellites (the
+%                   thrusters are prograde only, so the one that has to be
+%                   higher is raised).
+%     3. Inclination : each satellite holds the mean inclination that gives
+%                   exactly the sun-synchronous nodal rate. When the error
+%                   exceeds iDead, out-of-plane thrust with sign(cos(u)) is
+%                   applied (flipped at the polar points) until the error is
+%                   below iTol.
+%     The controller uses Brouwer-Lyddane mean elements referred to the
+%     true-of-date equator, averaged over the 15 orbits of the cycle.
+%
+%  DELTA-V ACCOUNTING
+%     Integrated from thrust/mass for every burn, separately for the
+%     tangential (altitude + along-track) and normal (inclination) thrusters,
+%     and cross-checked against the rocket equation from the propellant used
+%     (dvRkt1/2 must equal dvT + dvN of the same satellite).
+%
+%  OUTPUT (GMAT output folder)
+%     FormationSSO_FEEP_Daily.txt     one row per control cycle
+%     FormationSSO_FEEP_Summary.txt   delta-V budget and compliance summary
+%        dvT1/dvN1/dvT2/dvN2 : tangential / normal delta-V of Sat1 / Sat2, m/s
+%        dvTot               : total for the formation, m/s
+%        TMin/TMax           : along-track separation extremes, km
+%        ANMin/ANMax         : normal-separation amplitude extremes, km
+%        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
+%
+%  Run time is about 30 min for 5 years in GmatConsole (about 1 s per day).
+%  Set ControlOn = 0 for the uncontrolled (free-drift) reference case.
+%
+
+%----------------------------------------
+%---------- Spacecraft
+%----------------------------------------
+
+% Both satellites are defined by mean (Brouwer-Lyddane) elements in the Earth
+% true-of-date frame. The orbit and formation geometry are set at the start of
+% the mission sequence from the design parameters.
+Create Spacecraft Sat1;
+Sat1.DateFormat       = UTCGregorian;
+Sat1.Epoch            = '01 Jan 2027 00:00:00.000';
+Sat1.CoordinateSystem = EarthTOD;
+Sat1.DisplayStateType = BrouwerMeanShort;
+Sat1.BrouwerShortSMA  = 6978.137;
+Sat1.BrouwerShortECC  = 0.0012;
+Sat1.BrouwerShortINC  = 97.7876;
+Sat1.BrouwerShortRAAN = 258.7256;
+Sat1.BrouwerShortAOP  = 90;
+Sat1.BrouwerShortMA   = 0;
+Sat1.DryMass          = 50;
+Sat1.Cd               = 2.2;
+Sat1.Cr               = 1.3;
+Sat1.DragArea         = 0.5;
+Sat1.SRPArea          = 0.5;
+Sat1.Tanks            = {Tank1};
+Sat1.Thrusters        = {FeepT1, FeepNp1, FeepNm1};
+Sat1.PowerSystem      = FeepPower;
+
+Create Spacecraft Sat2;
+Sat2.DateFormat       = UTCGregorian;
+Sat2.Epoch            = '01 Jan 2027 00:00:00.000';
+Sat2.CoordinateSystem = EarthTOD;
+Sat2.DisplayStateType = BrouwerMeanShort;
+Sat2.BrouwerShortSMA  = 6978.137;
+Sat2.BrouwerShortECC  = 0.0012;
+Sat2.BrouwerShortINC  = 97.7876;
+Sat2.BrouwerShortRAAN = 258.7256;
+Sat2.BrouwerShortAOP  = 90;
+Sat2.BrouwerShortMA   = 0;
+Sat2.DryMass          = 50;
+Sat2.Cd               = 2.2;
+Sat2.Cr               = 1.3;
+Sat2.DragArea         = 0.55;
+Sat2.SRPArea          = 0.55;
+Sat2.Tanks            = {Tank2};
+Sat2.Thrusters        = {FeepT2, FeepNp2, FeepNm2};
+Sat2.PowerSystem      = FeepPower;
+
+%----------------------------------------
+%---------- Hardware Components
+%----------------------------------------
+
+% Idealised constant power source, so that eclipses and sun angle never limit
+% the FEEP thrust (the thrusters are modelled as ConstantThrustAndIsp).
+Create NuclearPowerSystem FeepPower;
+FeepPower.InitialMaxPower = 1;
+FeepPower.AnnualDecayRate = 0;
+FeepPower.Margin          = 0;
+FeepPower.BusCoeff1       = 0.1;
+FeepPower.BusCoeff2       = 0;
+FeepPower.BusCoeff3       = 0;
+
+Create ElectricTank Tank1;
+Tank1.AllowNegativeFuelMass = false;
+Tank1.FuelMass              = 1;
+
+Create ElectricTank Tank2;
+Tank2.AllowNegativeFuelMass = false;
+Tank2.FuelMass              = 1;
+
+% Satellite 1: prograde tangential thruster and +N / -N out-of-plane thrusters.
+% Thrust directions are fixed in the VNB frame (V = velocity, N = orbit normal).
+% ConstantThrust is in Newton. It must match the ThrustN variable below.
+Create ElectricThruster FeepT1;
+FeepT1.CoordinateSystem   = Local;
+FeepT1.Origin             = Earth;
+FeepT1.Axes               = VNB;
+FeepT1.ThrustDirection1   = 1;
+FeepT1.ThrustDirection2   = 0;
+FeepT1.ThrustDirection3   = 0;
+FeepT1.DutyCycle          = 0;
+FeepT1.DecrementMass      = true;
+FeepT1.Tank               = {Tank1};
+FeepT1.GravitationalAccel = 9.81;
+FeepT1.ThrustModel        = ConstantThrustAndIsp;
+FeepT1.MaximumUsablePower = 0.5;
+FeepT1.MinimumUsablePower = 0.001;
+FeepT1.ConstantThrust     = 0.001;
+FeepT1.Isp                = 3000;
+
+Create ElectricThruster FeepNp1;
+FeepNp1.CoordinateSystem   = Local;
+FeepNp1.Origin             = Earth;
+FeepNp1.Axes               = VNB;
+FeepNp1.ThrustDirection1   = 0;
+FeepNp1.ThrustDirection2   = 1;
+FeepNp1.ThrustDirection3   = 0;
+FeepNp1.DutyCycle          = 0;
+FeepNp1.DecrementMass      = true;
+FeepNp1.Tank               = {Tank1};
+FeepNp1.GravitationalAccel = 9.81;
+FeepNp1.ThrustModel        = ConstantThrustAndIsp;
+FeepNp1.MaximumUsablePower = 0.5;
+FeepNp1.MinimumUsablePower = 0.001;
+FeepNp1.ConstantThrust     = 0.001;
+FeepNp1.Isp                = 3000;
+
+Create ElectricThruster FeepNm1;
+FeepNm1.CoordinateSystem   = Local;
+FeepNm1.Origin             = Earth;
+FeepNm1.Axes               = VNB;
+FeepNm1.ThrustDirection1   = 0;
+FeepNm1.ThrustDirection2   = -1;
+FeepNm1.ThrustDirection3   = 0;
+FeepNm1.DutyCycle          = 0;
+FeepNm1.DecrementMass      = true;
+FeepNm1.Tank               = {Tank1};
+FeepNm1.GravitationalAccel = 9.81;
+FeepNm1.ThrustModel        = ConstantThrustAndIsp;
+FeepNm1.MaximumUsablePower = 0.5;
+FeepNm1.MinimumUsablePower = 0.001;
+FeepNm1.ConstantThrust     = 0.001;
+FeepNm1.Isp                = 3000;
+
+% Satellite 2: identical thruster set
+Create ElectricThruster FeepT2;
+FeepT2.CoordinateSystem   = Local;
+FeepT2.Origin             = Earth;
+FeepT2.Axes               = VNB;
+FeepT2.ThrustDirection1   = 1;
+FeepT2.ThrustDirection2   = 0;
+FeepT2.ThrustDirection3   = 0;
+FeepT2.DutyCycle          = 0;
+FeepT2.DecrementMass      = true;
+FeepT2.Tank               = {Tank2};
+FeepT2.GravitationalAccel = 9.81;
+FeepT2.ThrustModel        = ConstantThrustAndIsp;
+FeepT2.MaximumUsablePower = 0.5;
+FeepT2.MinimumUsablePower = 0.001;
+FeepT2.ConstantThrust     = 0.001;
+FeepT2.Isp                = 3000;
+
+Create ElectricThruster FeepNp2;
+FeepNp2.CoordinateSystem   = Local;
+FeepNp2.Origin             = Earth;
+FeepNp2.Axes               = VNB;
+FeepNp2.ThrustDirection1   = 0;
+FeepNp2.ThrustDirection2   = 1;
+FeepNp2.ThrustDirection3   = 0;
+FeepNp2.DutyCycle          = 0;
+FeepNp2.DecrementMass      = true;
+FeepNp2.Tank               = {Tank2};
+FeepNp2.GravitationalAccel = 9.81;
+FeepNp2.ThrustModel        = ConstantThrustAndIsp;
+FeepNp2.MaximumUsablePower = 0.5;
+FeepNp2.MinimumUsablePower = 0.001;
+FeepNp2.ConstantThrust     = 0.001;
+FeepNp2.Isp                = 3000;
+
+Create ElectricThruster FeepNm2;
+FeepNm2.CoordinateSystem   = Local;
+FeepNm2.Origin             = Earth;
+FeepNm2.Axes               = VNB;
+FeepNm2.ThrustDirection1   = 0;
+FeepNm2.ThrustDirection2   = -1;
+FeepNm2.ThrustDirection3   = 0;
+FeepNm2.DutyCycle          = 0;
+FeepNm2.DecrementMass      = true;
+FeepNm2.Tank               = {Tank2};
+FeepNm2.GravitationalAccel = 9.81;
+FeepNm2.ThrustModel        = ConstantThrustAndIsp;
+FeepNm2.MaximumUsablePower = 0.5;
+FeepNm2.MinimumUsablePower = 0.001;
+FeepNm2.ConstantThrust     = 0.001;
+FeepNm2.Isp                = 3000;
+
+%----------------------------------------
+%---------- Burns
+%----------------------------------------
+
+Create FiniteBurn Burn1;
+Burn1.Thrusters = {FeepT1, FeepNp1, FeepNm1};
+
+Create FiniteBurn Burn2;
+Burn2.Thrusters = {FeepT2, FeepNp2, FeepNm2};
+
+%----------------------------------------
+%---------- ForceModels
+%----------------------------------------
+
+% 8x8 EGM96, Sun and Moon point masses, SRP, NRLMSISE-00 drag driven by the
+% Schatten solar-cycle prediction (nominal cycle, nominal error model).
+% Change SchattenErrorModel to 'PlusTwoSigma' / 'MinusTwoSigma' and SchattenTimingModel
+% to 'EarlyCycle' / 'LateCycle' for high/low solar-activity scenarios.
+Create ForceModel FormationFM;
+FormationFM.CentralBody                      = Earth;
+FormationFM.PrimaryBodies                    = {Earth};
+FormationFM.PointMasses                      = {Sun, Luna};
+FormationFM.SRP                              = On;
+FormationFM.RelativisticCorrection           = Off;
+FormationFM.ErrorControl                     = RSSStep;
+FormationFM.GravityField.Earth.Degree        = 8;
+FormationFM.GravityField.Earth.Order         = 8;
+FormationFM.GravityField.Earth.PotentialFile = 'EGM96.cof';
+FormationFM.GravityField.Earth.TideModel     = 'None';
+FormationFM.SRP.Flux                         = 1367;
+FormationFM.SRP.SRPModel                     = Spherical;
+FormationFM.SRP.Nominal_Sun                  = 149597870.691;
+FormationFM.Drag.AtmosphereModel             = NRLMSISE00;
+FormationFM.Drag.HistoricWeatherSource       = 'ConstantFluxAndGeoMag';
+FormationFM.Drag.PredictedWeatherSource      = 'SchattenFile';
+FormationFM.Drag.SchattenFile                = 'SchattenPredict.txt';
+FormationFM.Drag.SchattenErrorModel          = 'Nominal';
+FormationFM.Drag.SchattenTimingModel         = 'NominalCycle';
+FormationFM.Drag.F107                        = 150;
+FormationFM.Drag.F107A                       = 150;
+FormationFM.Drag.MagneticIndex               = 3;
+
+%----------------------------------------
+%---------- Propagators
+%----------------------------------------
+
+Create Propagator FormationProp;
+FormationProp.FM                       = FormationFM;
+FormationProp.Type                     = PrinceDormand78;
+FormationProp.InitialStepSize          = 60;
+FormationProp.Accuracy                 = 1e-10;
+FormationProp.MinStep                  = 0.001;
+FormationProp.MaxStep                  = 300;
+FormationProp.MaxStepAttempts          = 50;
+FormationProp.StopIfAccuracyIsViolated = true;
+
+%----------------------------------------
+%---------- Coordinate Systems
+%----------------------------------------
+
+% Earth true-of-date equator. The mean elements (inclination, RAAN) used for
+% control are referred to it: relative to the J2000 equator the inclination
+% oscillates by ~0.1 deg with the precession accumulated since 2000, which
+% would be mistaken for a real drift.
+Create CoordinateSystem EarthTOD;
+EarthTOD.Origin = Earth;
+EarthTOD.Axes   = TODEq;
+
+% RTN frame centred on Sat1: X = radial, Y = along-track, Z = orbit normal.
+% Sat2.Sat1RTN.Y is the along-track separation, Sat2.Sat1RTN.Z the normal one.
+Create CoordinateSystem Sat1RTN;
+Sat1RTN.Origin    = Sat1;
+Sat1RTN.Axes      = ObjectReferenced;
+Sat1RTN.XAxis     = R;
+Sat1RTN.ZAxis     = N;
+Sat1RTN.Primary   = Earth;
+Sat1RTN.Secondary = Sat1;
+
+%----------------------------------------
+%---------- Variables
+%----------------------------------------
+
+% Design parameters
+Create Variable ControlOn MissionDays MissionSecs MissionOrbits CycleOrbits CycleSecs;
+Create Variable aRef eRef iRef aopRef raanRef;
+Create Variable NAmp T0 TLow THigh TCenter VdT VtolT kappaT;
+Create Variable ThrustN Isp0 g0;
+
+% Controller tuning
+Create Variable tauA tauI iDead iTol iEff ffInit;
+
+% Constants
+Create Variable muE ReE J2E PiC;
+
+% Initial geometry
+Create Variable iRad sI cI dRaanRad dRaan du0;
+
+% Time, cycle and orbit bookkeeping
+Create Variable tNext tSim tDays nCyc nOrbCycle orbT orbDone orbNext finished iOrb iSeg;
+Create Variable uTarget uNow1 uNow2 uErr uDotNom TnNom;
+
+% Cycle measurements and commands (suffix 1 / 2 = satellite)
+Create Variable aM1 aM2 iM1 iM2 raanM1 raanM2 eM1 eM2 aAvg1 aAvg2 iAvg1 iAvg2;
+Create Variable sumA1 sumA2 sumI1 sumI2 aTmp iTmp;
+Create Variable Trel Nrel Rrel Rng ANamp dRaanM diM;
+Create Variable Tprev TdotM TdotDes dTe dANeed relMode doRel absTe CyclePrev dACmd aTgt1 aTgt2;
+Create Variable nM1 nM2 uDot1 uDot2 uDotD1 uDotD2 sM1 sM2 s2M1 s2M2 vCirc1 vCirc2;
+Create Variable mass1 mass2 fMax1 fMax2;
+Create Variable delta1 delta2 absD1 absD2 ff1 ff2 fCmd1 fCmd2 dutyT1 dutyT2 Kp1 Kp2;
+Create Variable diErr1 diErr2 absDi1 absDi2 camp1 camp2 sAsc1 sAsc2 dutyN1 dutyN2 diMax1 diMax2;
+Create Variable aop1 aop2 ta1 ta2 uTmp1 uTmp2 cu1 cu2 s01 s02 tb1 tb2 segT sg;
+Create Variable dvT1 dvN1 dvT2 dvN2 dvTot mProp1 mProp2 dvRkt1 dvRkt2 m01 m02;
+Create Variable dutySumT1 dutySumT2 dutyMaxT1 dutyMaxT2 campCyc1 campCyc2;
+
+% Compliance statistics
+Create Variable TMin TMax ANMin ANMax RngMin dAMax1 dAMax2 nOutT nOutN nRel;
+
+%----------------------------------------
+%---------- Subscribers
+%----------------------------------------
+
+Create ReportFile DailyReport;
+DailyReport.Filename       = 'FormationSSO_FEEP_Daily.txt';
+DailyReport.Precision      = 10;
+DailyReport.WriteHeaders   = true;
+DailyReport.LeftJustify    = On;
+DailyReport.ZeroFill       = Off;
+DailyReport.FixedWidth     = true;
+DailyReport.ColumnWidth    = 20;
+DailyReport.WriteReport    = true;
+
+Create ReportFile SummaryReport;
+SummaryReport.Filename     = 'FormationSSO_FEEP_Summary.txt';
+SummaryReport.Precision    = 8;
+SummaryReport.WriteHeaders = true;
+SummaryReport.LeftJustify  = On;
+SummaryReport.ZeroFill     = Off;
+SummaryReport.FixedWidth   = true;
+SummaryReport.ColumnWidth  = 20;
+SummaryReport.WriteReport  = true;
+
+%----------------------------------------
+%---------- Mission Sequence
+%----------------------------------------
+
+BeginMissionSequence;
+
+%---------------------------------------------------------------
+%  Design parameters (edit here)
+%---------------------------------------------------------------
+ControlOn   = 1;         % 1 = controlled, 0 = free drift (no thrust at all)
+MissionDays = 1826;      % 5 years incl. one leap day (2028)
+CycleOrbits = 15;        % control cycle = 15 nodal periods (~1.009 day)
+
+% Reference mean orbit (Brouwer-Lyddane "short" mean elements, true-of-date)
+aRef    = 6978.137;      % km, 600 km altitude
+eRef    = 0.0012;        % frozen-orbit eccentricity
+aopRef  = 90;            % deg, frozen-orbit argument of perigee
+iRef    = 97.808;        % deg, tuned for exactly sun-synchronous nodal rate
+raanRef = 258.7256;      % deg, LTAN 10:30 at 01 Jan 2027 (centre of the pair)
+
+% Formation requirement (Sat2 relative to Sat1, RTN)
+NAmp    = 200;           % km, normal separation amplitude
+T0      = 525;           % km, initial along-track separation (mid corridor)
+TLow    = 100;           % km, reverse drift below this (requirement: 50)
+THigh   = 950;           % km, reverse drift above this (requirement: 1000)
+TCenter = 525;           % km, stop the reversal drift when back at this value
+VdT     = 1.5;           % km/day, drift rate used to come back from a limit
+VtolT   = 0.4;           % km/day, tolerance on the commanded drift rate
+kappaT  = 0.3;           % fraction of the needed SMA change commanded per cycle
+
+% FEEP assumptions (ThrustN must equal ConstantThrust above, Isp0 the Isp)
+ThrustN = 0.001;         % N per thruster
+Isp0    = 3000;          % s
+g0      = 9.81;          % m/s^2, same value as the thrusters' GravitationalAccel
+
+% Controller tuning
+tauA    = 129600;        % s, altitude loop time constant (1.5 day)
+tauI    = 1296000;       % s, altitude loop integral time (15 day, overdamped)
+ffInit  = 2.0e-7;        % m/s^2, first guess of the drag make-up acceleration
+iDead   = 0.002;         % deg, start inclination correction above this error
+iTol    = 0.0005;        % deg, stop inclination correction below this error
+iEff    = 0.85;          % fraction of the available di/cycle commanded
+
+% Constants (EGM96)
+muE = 398600.4415;
+ReE = 6378.1363;
+J2E = 1.08262668e-3;
+PiC = 3.14159265358979;
+
+%---------------------------------------------------------------
+%  Initial formation geometry
+%---------------------------------------------------------------
+MissionSecs = MissionDays * 86400;
+iRad     = degToRad(iRef);
+sI       = sin(iRad);
+cI       = cos(iRad);
+dRaanRad = NAmp / (aRef * sI);
+dRaan    = radToDeg(dRaanRad);
+du0      = radToDeg(T0 / aRef) - dRaan * cI;
+
+Sat1.BrouwerShortSMA  = aRef;
+Sat1.BrouwerShortECC  = eRef;
+Sat1.BrouwerShortINC  = iRef;
+Sat1.BrouwerShortRAAN = raanRef - 0.5 * dRaan;
+Sat1.BrouwerShortAOP  = aopRef;
+Sat1.BrouwerShortMA   = 0;
+
+Sat2.BrouwerShortSMA  = aRef;
+Sat2.BrouwerShortECC  = eRef;
+Sat2.BrouwerShortINC  = iRef;
+Sat2.BrouwerShortRAAN = raanRef + 0.5 * dRaan;
+Sat2.BrouwerShortAOP  = aopRef;
+Sat2.BrouwerShortMA   = du0;
+
+%---------------------------------------------------------------
+%  Initialise controller state and statistics
+%---------------------------------------------------------------
+tSim = 0;
+nCyc = 0;
+orbDone = 0;
+finished = 0;
+dACmd = 0;
+relMode = 0;
+Tprev = T0;
+CyclePrev = 86400;
+ff1 = ffInit;
+ff2 = ffInit;
+camp1 = 0;
+camp2 = 0;
+dvT1 = 0;
+dvN1 = 0;
+dvT2 = 0;
+dvN2 = 0;
+dutySumT1 = 0;
+dutySumT2 = 0;
+dutyMaxT1 = 0;
+dutyMaxT2 = 0;
+campCyc1 = 0;
+campCyc2 = 0;
+TMin = 1e9;
+TMax = -1e9;
+ANMin = 1e9;
+ANMax = -1e9;
+RngMin = 1e9;
+dAMax1 = 0;
+dAMax2 = 0;
+nOutT = 0;
+nOutN = 0;
+nRel = 0;
+m01 = Sat1.TotalMass;
+m02 = Sat2.TotalMass;
+
+% Mean elements fed to the controller are averaged over the 15 orbits of the
+% previous cycle (sampled once per orbit at the same argument of latitude).
+% This removes the tesseral-harmonic short-period terms (tens of metres in SMA),
+% which would otherwise look like noise to the controller.
+aAvg1 = Sat1.EarthTOD.BrouwerShortSMA;
+aAvg2 = Sat2.EarthTOD.BrouwerShortSMA;
+iAvg1 = Sat1.EarthTOD.BrouwerShortINC;
+iAvg2 = Sat2.EarthTOD.BrouwerShortINC;
+
+% Argument of latitude at which the cycle starts, kept constant by adjusting
+% the length of each cycle. Mission length in orbits from the nominal period.
+aop1 = Sat1.EarthTOD.AOP;
+ta1  = Sat1.Earth.TA;
+uTmp1 = aop1 + ta1;
+uTarget = mod(uTmp1, 360);
+nM1     = sqrt(muE / (aRef*aRef*aRef));
+s2M1    = sI * sI;
+uDotNom = nM1 * (1 + J2E * (ReE/aRef) * (ReE/aRef) * (4.5 - 6 * s2M1));
+TnNom   = 2 * PiC / uDotNom;
+MissionOrbits = fix(MissionSecs / TnNom);
+
+While finished == 0
+
+   %------------------------------------------------------------
+   %  1. Measurements: relative RTN state, mean elements for the log
+   %------------------------------------------------------------
+   tDays  = tSim / 86400;
+   aM1    = Sat1.EarthTOD.BrouwerShortSMA;
+   aM2    = Sat2.EarthTOD.BrouwerShortSMA;
+   iM1    = Sat1.EarthTOD.BrouwerShortINC;
+   iM2    = Sat2.EarthTOD.BrouwerShortINC;
+   raanM1 = Sat1.EarthTOD.BrouwerShortRAAN;
+   raanM2 = Sat2.EarthTOD.BrouwerShortRAAN;
+   eM1    = Sat1.EarthTOD.BrouwerShortECC;
+   eM2    = Sat2.EarthTOD.BrouwerShortECC;
+   Rrel   = Sat2.Sat1RTN.X;
+   Trel   = Sat2.Sat1RTN.Y;
+   Nrel   = Sat2.Sat1RTN.Z;
+   Rng    = sqrt(Rrel*Rrel + Trel*Trel + Nrel*Nrel);
+   mass1  = Sat1.TotalMass;
+   mass2  = Sat2.TotalMass;
+
+   % Normal-separation amplitude from the mean-element differences
+   dRaanM = raanM2 - raanM1;
+   If dRaanM > 180
+      dRaanM = dRaanM - 360;
+   EndIf;
+   If dRaanM < -180
+      dRaanM = dRaanM + 360;
+   EndIf;
+   diM    = degToRad(iAvg2 - iAvg1);
+   dRaanM = degToRad(dRaanM);
+   sM1    = sin(degToRad(iAvg1));
+   ANamp  = aAvg1 * sqrt(diM*diM + sM1*sM1*dRaanM*dRaanM);
+
+   % Statistics
+   If Trel < TMin
+      TMin = Trel;
+   EndIf;
+   If Trel > TMax
+      TMax = Trel;
+   EndIf;
+   If ANamp < ANMin
+      ANMin = ANamp;
+   EndIf;
+   If ANamp > ANMax
+      ANMax = ANamp;
+   EndIf;
+   If Rng < RngMin
+      RngMin = Rng;
+   EndIf;
+   If Trel < 50
+      nOutT = nOutT + 1;
+   EndIf;
+   If Trel > 1000
+      nOutT = nOutT + 1;
+   EndIf;
+   If ANamp < 180
+      nOutN = nOutN + 1;
+   EndIf;
+   If ANamp > 220
+      nOutN = nOutN + 1;
+   EndIf;
+
+   %------------------------------------------------------------
+   %  2. Cycle length: 15 nodal periods, phase locked to Sat1
+   %------------------------------------------------------------
+   orbNext = orbDone + CycleOrbits;
+   nOrbCycle = CycleOrbits;
+   If orbNext > MissionOrbits
+      nOrbCycle = MissionOrbits - orbDone;
+   EndIf;
+   If nOrbCycle < 1
+      nOrbCycle = 1;
+   EndIf;
+   nM1     = sqrt(muE / (aAvg1*aAvg1*aAvg1));
+   nM2     = sqrt(muE / (aAvg2*aAvg2*aAvg2));
+   sM1     = sin(degToRad(iAvg1));
+   sM2     = sin(degToRad(iAvg2));
+   s2M1    = sM1 * sM1;
+   s2M2    = sM2 * sM2;
+   uDot1   = nM1 * (1 + J2E * (ReE/aAvg1) * (ReE/aAvg1) * (4.5 - 6 * s2M1));
+   uDot2   = nM2 * (1 + J2E * (ReE/aAvg2) * (ReE/aAvg2) * (4.5 - 6 * s2M2));
+   uDotD1  = radToDeg(uDot1);
+   uDotD2  = radToDeg(uDot2);
+   aop1    = Sat1.EarthTOD.AOP;
+   ta1     = Sat1.Earth.TA;
+   uTmp1   = aop1 + ta1;
+   uNow1   = mod(uTmp1, 360);
+   aop2    = Sat2.EarthTOD.AOP;
+   ta2     = Sat2.Earth.TA;
+   uTmp2   = aop2 + ta2;
+   uNow2   = mod(uTmp2, 360);
+   uErr    = uTarget - uNow1;
+   If uErr > 180
+      uErr = uErr - 360;
+   EndIf;
+   If uErr < -180
+      uErr = uErr + 360;
+   EndIf;
+   CycleSecs = (360 * nOrbCycle + uErr) / uDotD1;
+   orbT      = CycleSecs / nOrbCycle;
+
+   %------------------------------------------------------------
+   %  3. Relative along-track logic (drift reversal with hysteresis)
+   %     Uses the measured drift rate, not absolute SMA differences.
+   %------------------------------------------------------------
+   TdotM = 0;
+   If nCyc > 0
+      TdotM = (Trel - Tprev) / (CyclePrev / 86400);
+   EndIf;
+   TdotDes = 0;
+   doRel = 0;
+   If relMode == 0
+      If Trel > THigh
+         relMode = -1;
+         doRel = 1;
+      EndIf;
+      If Trel < TLow
+         relMode = 1;
+         doRel = 1;
+      EndIf;
+   Else
+      If relMode < 0
+         If Trel < TCenter
+            relMode = 0;
+            doRel = 1;
+         EndIf;
+      Else
+         If Trel > TCenter
+            relMode = 0;
+            doRel = 1;
+         EndIf;
+      EndIf;
+   EndIf;
+   If relMode < 0
+      TdotDes = -VdT;
+   EndIf;
+   If relMode > 0
+      TdotDes = VdT;
+   EndIf;
+   dTe = TdotDes - TdotM;
+   absTe = abs(dTe);
+   If relMode ~= 0
+      If absTe > VtolT
+         doRel = 1;
+      EndIf;
+   EndIf;
+   If doRel == 1
+      % T-dot = -1.5 n da  ->  SMA change needed for the commanded drift rate
+      dANeed = -dTe / (86400 * 1.5 * nM1);
+      dACmd  = dACmd + kappaT * dANeed;
+      nRel   = nRel + 1;
+      If dACmd > 0.2
+         dACmd = 0.2;
+      EndIf;
+      If dACmd < -0.2
+         dACmd = -0.2;
+      EndIf;
+   EndIf;
+   Tprev     = Trel;
+   CyclePrev = CycleSecs;
+   % The thrusters are prograde only, so a relative SMA offset is made by
+   % raising whichever satellite has to be higher.
+   aTgt1 = aRef;
+   aTgt2 = aRef;
+   If dACmd > 0
+      aTgt2 = aRef + dACmd;
+   EndIf;
+   If dACmd < 0
+      aTgt1 = aRef - dACmd;
+   EndIf;
+
+   %------------------------------------------------------------
+   %  4. Tangential thrust command (PI on mean SMA, prograde only)
+   %------------------------------------------------------------
+   Kp1    = nM1 / (2 * tauA);
+   Kp2    = nM2 / (2 * tauA);
+   fMax1  = ThrustN / mass1;
+   fMax2  = ThrustN / mass2;
+
+   delta1 = (aAvg1 - aTgt1) * 1000;
+   delta2 = (aAvg2 - aTgt2) * 1000;
+   absD1  = abs(delta1);
+   absD2  = abs(delta2);
+   If absD1 > dAMax1
+      dAMax1 = absD1;
+   EndIf;
+   If absD2 > dAMax2
+      dAMax2 = absD2;
+   EndIf;
+
+   ff1 = ff1 - (Kp1 / tauI) * delta1 * CycleSecs;
+   ff2 = ff2 - (Kp2 / tauI) * delta2 * CycleSecs;
+   If ff1 < 0
+      ff1 = 0;
+   EndIf;
+   If ff1 > fMax1
+      ff1 = fMax1;
+   EndIf;
+   If ff2 < 0
+      ff2 = 0;
+   EndIf;
+   If ff2 > fMax2
+      ff2 = fMax2;
+   EndIf;
+   fCmd1 = ff1 - Kp1 * delta1;
+   fCmd2 = ff2 - Kp2 * delta2;
+   If fCmd1 < 0
+      fCmd1 = 0;
+   EndIf;
+   If fCmd1 > fMax1
+      fCmd1 = fMax1;
+   EndIf;
+   If fCmd2 < 0
+      fCmd2 = 0;
+   EndIf;
+   If fCmd2 > fMax2
+      fCmd2 = fMax2;
+   EndIf;
+   dutyT1 = fCmd1 / fMax1;
+   dutyT2 = fCmd2 / fMax2;
+
+   %------------------------------------------------------------
+   %  5. Inclination (out-of-plane) command with hysteresis
+   %------------------------------------------------------------
+   diErr1 = iAvg1 - iRef;
+   diErr2 = iAvg2 - iRef;
+   absDi1 = abs(diErr1);
+   absDi2 = abs(diErr2);
+   If absDi1 > iDead
+      camp1 = 1;
+   EndIf;
+   If absDi1 < iTol
+      camp1 = 0;
+   EndIf;
+   If absDi2 > iDead
+      camp2 = 1;
+   EndIf;
+   If absDi2 < iTol
+      camp2 = 0;
+   EndIf;
+
+   % Orbit-averaged di/dt of a sign(cos u) out-of-plane thrust: (2/pi) fN / v
+   vCirc1 = sqrt(muE / aAvg1) * 1000;
+   vCirc2 = sqrt(muE / aAvg2) * 1000;
+   diMax1 = radToDeg((2 / PiC) * (fMax1 / vCirc1) * CycleSecs);
+   diMax2 = radToDeg((2 / PiC) * (fMax2 / vCirc2) * CycleSecs);
+   dutyN1 = 0;
+   dutyN2 = 0;
+   sAsc1  = 1;
+   sAsc2  = 1;
+   If camp1 == 1
+      If diErr1 > 0
+         sAsc1 = -1;
+         dutyN1 = diErr1 / (iEff * diMax1);
+      Else
+         sAsc1 = 1;
+         dutyN1 = -diErr1 / (iEff * diMax1);
+      EndIf;
+      If dutyN1 > 1
+         dutyN1 = 1;
+      EndIf;
+   EndIf;
+   If camp2 == 1
+      If diErr2 > 0
+         sAsc2 = -1;
+         dutyN2 = diErr2 / (iEff * diMax2);
+      Else
+         sAsc2 = 1;
+         dutyN2 = -diErr2 / (iEff * diMax2);
+      EndIf;
+      If dutyN2 > 1
+         dutyN2 = 1;
+      EndIf;
+   EndIf;
+
+   If ControlOn == 0
+      dutyT1 = 0;
+      dutyT2 = 0;
+      dutyN1 = 0;
+      dutyN2 = 0;
+      camp1  = 0;
+      camp2  = 0;
+   EndIf;
+
+   %------------------------------------------------------------
+   %  6. Log
+   %------------------------------------------------------------
+   Report DailyReport tDays uNow1 aAvg1 aAvg2 iAvg1 iAvg2 raanM1 raanM2 eM1 eM2 Rrel Trel Nrel Rng ANamp dACmd TdotM dutyT1 dutyT2 dutyN1 dutyN2 dvT1 dvN1 dvT2 dvN2 mass1 mass2 CycleSecs;
+
+   % The last pass (all orbits done) only measures and logs.
+   If orbDone >= MissionOrbits
+      finished = 1;
+   EndIf;
+
+   If finished == 0
+
+      dutySumT1 = dutySumT1 + dutyT1;
+      dutySumT2 = dutySumT2 + dutyT2;
+      If dutyT1 > dutyMaxT1
+         dutyMaxT1 = dutyT1;
+      EndIf;
+      If dutyT2 > dutyMaxT2
+         dutyMaxT2 = dutyT2;
+      EndIf;
+
+      %---------------------------------------------------------
+      %  7. Propagate Sat1 one cycle (continuous finite burns)
+      %---------------------------------------------------------
+      sumA1 = 0;
+      sumI1 = 0;
+      iOrb  = 1;
+      Sat1.FeepT1.DutyCycle  = dutyT1;
+      Sat1.FeepNp1.DutyCycle = 0;
+      Sat1.FeepNm1.DutyCycle = 0;
+      If camp1 == 0
+         BeginFiniteBurn Burn1(Sat1);
+         While iOrb <= nOrbCycle
+            Propagate FormationProp(Sat1) {Sat1.ElapsedSecs = orbT};
+            aTmp  = Sat1.EarthTOD.BrouwerShortSMA;
+            iTmp  = Sat1.EarthTOD.BrouwerShortINC;
+            sumA1 = sumA1 + aTmp;
+            sumI1 = sumI1 + iTmp;
+            iOrb  = iOrb + 1;
+         EndWhile;
+         EndFiniteBurn Burn1(Sat1);
+      Else
+         % Inclination campaign. The out-of-plane thrust follows sign(cos u): it
+         % is flipped at the polar points (u = 90 and 270 deg). Each orbit is
+         % split into three segments between those switching points.
+         campCyc1 = campCyc1 + 1;
+         cu1  = cos(degToRad(uNow1));
+         s01  = sAsc1;
+         If cu1 < 0
+            s01 = -sAsc1;
+         EndIf;
+         tb1  = 450 - uNow1;
+         tb1  = mod(tb1, 180);
+         tb1  = tb1 / uDotD1;
+         While iOrb <= nOrbCycle
+            iSeg = 1;
+            While iSeg <= 3
+               segT = 0.5 * orbT;
+               sg   = -s01;
+               If iSeg == 1
+                  segT = tb1;
+                  sg   = s01;
+               EndIf;
+               If iSeg == 3
+                  segT = 0.5 * orbT - tb1;
+                  sg   = s01;
+               EndIf;
+               If segT > 0.5
+                  If sg > 0
+                     Sat1.FeepNp1.DutyCycle = dutyN1;
+                     Sat1.FeepNm1.DutyCycle = 0;
+                  Else
+                     Sat1.FeepNp1.DutyCycle = 0;
+                     Sat1.FeepNm1.DutyCycle = dutyN1;
+                  EndIf;
+                  BeginFiniteBurn Burn1(Sat1);
+                  Propagate FormationProp(Sat1) {Sat1.ElapsedSecs = segT};
+                  EndFiniteBurn Burn1(Sat1);
+                  dvN1 = dvN1 + dutyN1 * fMax1 * segT;
+               EndIf;
+               iSeg = iSeg + 1;
+            EndWhile;
+            aTmp  = Sat1.EarthTOD.BrouwerShortSMA;
+            iTmp  = Sat1.EarthTOD.BrouwerShortINC;
+            sumA1 = sumA1 + aTmp;
+            sumI1 = sumI1 + iTmp;
+            iOrb  = iOrb + 1;
+         EndWhile;
+         Sat1.FeepNp1.DutyCycle = 0;
+         Sat1.FeepNm1.DutyCycle = 0;
+      EndIf;
+      dvT1  = dvT1 + dutyT1 * fMax1 * CycleSecs;
+      aAvg1 = sumA1 / nOrbCycle;
+      iAvg1 = sumI1 / nOrbCycle;
+
+      %---------------------------------------------------------
+      %  8. Propagate Sat2 one cycle
+      %---------------------------------------------------------
+      sumA2 = 0;
+      sumI2 = 0;
+      iOrb  = 1;
+      Sat2.FeepT2.DutyCycle  = dutyT2;
+      Sat2.FeepNp2.DutyCycle = 0;
+      Sat2.FeepNm2.DutyCycle = 0;
+      If camp2 == 0
+         BeginFiniteBurn Burn2(Sat2);
+         While iOrb <= nOrbCycle
+            Propagate FormationProp(Sat2) {Sat2.ElapsedSecs = orbT};
+            aTmp  = Sat2.EarthTOD.BrouwerShortSMA;
+            iTmp  = Sat2.EarthTOD.BrouwerShortINC;
+            sumA2 = sumA2 + aTmp;
+            sumI2 = sumI2 + iTmp;
+            iOrb  = iOrb + 1;
+         EndWhile;
+         EndFiniteBurn Burn2(Sat2);
+      Else
+         campCyc2 = campCyc2 + 1;
+         cu2  = cos(degToRad(uNow2));
+         s02  = sAsc2;
+         If cu2 < 0
+            s02 = -sAsc2;
+         EndIf;
+         tb2  = 450 - uNow2;
+         tb2  = mod(tb2, 180);
+         tb2  = tb2 / uDotD2;
+         While iOrb <= nOrbCycle
+            iSeg = 1;
+            While iSeg <= 3
+               segT = 0.5 * orbT;
+               sg   = -s02;
+               If iSeg == 1
+                  segT = tb2;
+                  sg   = s02;
+               EndIf;
+               If iSeg == 3
+                  segT = 0.5 * orbT - tb2;
+                  sg   = s02;
+               EndIf;
+               If segT > 0.5
+                  If sg > 0
+                     Sat2.FeepNp2.DutyCycle = dutyN2;
+                     Sat2.FeepNm2.DutyCycle = 0;
+                  Else
+                     Sat2.FeepNp2.DutyCycle = 0;
+                     Sat2.FeepNm2.DutyCycle = dutyN2;
+                  EndIf;
+                  BeginFiniteBurn Burn2(Sat2);
+                  Propagate FormationProp(Sat2) {Sat2.ElapsedSecs = segT};
+                  EndFiniteBurn Burn2(Sat2);
+                  dvN2 = dvN2 + dutyN2 * fMax2 * segT;
+               EndIf;
+               iSeg = iSeg + 1;
+            EndWhile;
+            aTmp  = Sat2.EarthTOD.BrouwerShortSMA;
+            iTmp  = Sat2.EarthTOD.BrouwerShortINC;
+            sumA2 = sumA2 + aTmp;
+            sumI2 = sumI2 + iTmp;
+            iOrb  = iOrb + 1;
+         EndWhile;
+         Sat2.FeepNp2.DutyCycle = 0;
+         Sat2.FeepNm2.DutyCycle = 0;
+      EndIf;
+      dvT2  = dvT2 + dutyT2 * fMax2 * CycleSecs;
+      aAvg2 = sumA2 / nOrbCycle;
+      iAvg2 = sumI2 / nOrbCycle;
+
+      tSim    = tSim + CycleSecs;
+      orbDone = orbDone + nOrbCycle;
+      nCyc    = nCyc + 1;
+   EndIf;
+EndWhile;
+
+%---------------------------------------------------------------
+%  Summary
+%---------------------------------------------------------------
+mProp1    = m01 - Sat1.TotalMass;
+mProp2    = m02 - Sat2.TotalMass;
+dvRkt1    = Isp0 * g0 * log(m01 / Sat1.TotalMass);
+dvRkt2    = Isp0 * g0 * log(m02 / Sat2.TotalMass);
+dvTot     = dvT1 + dvN1 + dvT2 + dvN2;
+dutySumT1 = dutySumT1 / nCyc;
+dutySumT2 = dutySumT2 / nCyc;
+
+Report SummaryReport MissionDays tDays nCyc dvT1 dvN1 dvT2 dvN2 dvTot dvRkt1 dvRkt2 mProp1 mProp2;
+Report SummaryReport dutySumT1 dutyMaxT1 dutySumT2 dutyMaxT2 campCyc1 campCyc2 dAMax1 dAMax2 nRel;
+Report SummaryReport TMin TMax ANMin ANMax RngMin nOutT nOutN;
