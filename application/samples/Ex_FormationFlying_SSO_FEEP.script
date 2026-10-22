@@ -86,6 +86,8 @@
 %   out of the corridor in about a year.
 %
 %  Run time is about 30 min for 5 years in GmatConsole (about 1 s per day).
+%  Plots and a budget table from the output files: plot_formation_results.py
+%  (same folder), e.g.  python plot_formation_results.py <GMAT output folder>
 %  Set ControlOn = 0 for the uncontrolled (free-drift) reference case.
 %
 
