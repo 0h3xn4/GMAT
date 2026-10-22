@@ -64,6 +64,16 @@
 %        ANMin/ANMax         : normal-separation amplitude extremes, km
 %        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
 %
+%  REFERENCE RESULTS with the defaults below (GMAT R2026a, 5 years, m/s)
+%                         Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
+%     Schatten nominal        2.5       31.5        2.7       29.7       66.5
+%     +2 sigma, late cycle    6.2       31.4        6.8       29.6       74.0
+%     tang = altitude + along-track, norm = inclination (sun-synchronous).
+%     Along-track 292..531 km (limit 50..1000), N amplitude 198..206 km,
+%     LTAN within 1.3 min of the start, 60 g of propellant per satellite.
+%     Without control the same pair drifts out of the corridor within about a
+%     year and the LTAN slips by 1 hour over 5 years.
+%
 %  Run time is about 30 min for 5 years in GmatConsole (about 1 s per day).
 %  Set ControlOn = 0 for the uncontrolled (free-drift) reference case.
 %
