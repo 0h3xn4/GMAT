@@ -374,7 +374,7 @@ Create Variable uTarget uNow1 uNow2 uErr uDotNom TnNom;
 Create Variable aM1 aM2 iM1 iM2 raanM1 raanM2 eM1 eM2 aAvg1 aAvg2 iAvg1 iAvg2;
 Create Variable sumA1 sumA2 sumI1 sumI2 aTmp iTmp;
 Create Variable Trel Nrel Rrel Rng ANamp dRaanM dRaanDeg diM;
-Create Variable diCmd iTgt2 eOm absEo nOmEv;
+Create Variable diCmd iTgt2 eOm absEo nOmEv HoldSSO iDeadRel iAimRel;
 Create Variable Tprev TdotM TdotDes dTe dANeed relMode doRel absTe CyclePrev dACmd aTgt1 aTgt2;
 Create Variable nM1 nM2 uDot1 uDot2 uDotD1 uDotD2 sM1 sM2 s2M1 s2M2 vCirc1 vCirc2;
 Create Variable mass1 mass2 fMax1 fMax2;
@@ -421,6 +421,9 @@ BeginMissionSequence;
 %  Design parameters (edit here)
 %---------------------------------------------------------------
 ControlOn   = 1;         % 1 = controlled, 0 = free drift (no thrust at all)
+HoldSSO     = 0;         % 1 = also hold the sun-synchronous inclination (and so the LTAN)
+                         % 0 = no absolute inclination control: the orbit plane may
+                         %     drift, only the formation geometry is kept
 MissionDays = 1826;      % 5 years incl. one leap day (2028)
 CycleOrbits = 15;        % control cycle = 15 nodal periods (~1.009 day)
 
@@ -453,6 +456,9 @@ ffInit  = 2.0e-7;        % m/s^2, first guess of the drag make-up acceleration
 iDead   = 0.01;          % deg, start an inclination campaign above this error
 iTol    = 0.0005;        % deg, a campaign ends when the commanded change left is below this
 iAim    = 0.005;         % deg, a campaign aims this far past the reference (against the drift)
+iDeadRel = 0.001;        % deg, HoldSSO = 0: Sat2 corrects when its inclination differs
+                         %      from Sat1's by more than this
+iAimRel = 0.0005;        % deg, ... and aims this far past Sat1's inclination
 eOmTol  = 0.04;          % deg, tolerated drift of the RAAN offset (about 5 km of N amplitude)
 diBias  = 0.004;         % deg, differential inclination used to steer the RAAN offset back
 
@@ -798,11 +804,16 @@ While finished == 0
       EndIf;
    EndIf;
    iTgt2  = iRef + diCmd;
+   If HoldSSO == 0
+      iTgt2 = iAvg1 + diCmd;
+   EndIf;
    diErr1 = iAvg1 - iRef;
    diErr2 = iAvg2 - iTgt2;
    absDi1 = abs(diErr1);
    absDi2 = abs(diErr2);
 
+   % With HoldSSO = 0 the satellites follow Sat1's inclination: only Sat2 runs
+   % campaigns, relative to Sat1, and Sat1 never does.
    % A campaign is planned open loop: when a limit is reached, the change needed
    % to get to the aim point is commanded over as many cycles as it takes, and
    % the commanded change (not the lagging measurement) is counted down.
@@ -814,27 +825,43 @@ While finished == 0
    aimSign = 0;
    If camp1 == 0
       If camp2 == 0
-         If absDi1 > iDead
-            startC = 1;
-            aimSign = 1;
-            If diErr1 > 0
-               aimSign = -1;
+         If HoldSSO == 1
+            If absDi1 > iDead
+               startC = 1;
+               aimSign = 1;
+               If diErr1 > 0
+                  aimSign = -1;
+               EndIf;
             EndIf;
-         EndIf;
-         If absDi2 > iDead2
-            startC = 1;
-            aimSign = 1;
-            If diErr2 > 0
-               aimSign = -1;
+            If absDi2 > iDead2
+               startC = 1;
+               aimSign = 1;
+               If diErr2 > 0
+                  aimSign = -1;
+               EndIf;
+            EndIf;
+         Else
+            % Only the inclination of Sat2 relative to Sat1 is controlled.
+            If absDi2 > iDeadRel
+               startC = 1;
+               aimSign = 1;
+               If diErr2 > 0
+                  aimSign = -1;
+               EndIf;
             EndIf;
          EndIf;
       EndIf;
    EndIf;
    If startC == 1
-      camp1  = 1;
-      camp2  = 1;
-      diRem1 = -diErr1 + aimSign * iAim;
-      diRem2 = -diErr2 + aimSign * iAim;
+      If HoldSSO == 1
+         camp1  = 1;
+         camp2  = 1;
+         diRem1 = -diErr1 + aimSign * iAim;
+         diRem2 = -diErr2 + aimSign * iAim;
+      Else
+         camp2  = 1;
+         diRem2 = -diErr2 + aimSign * iAimRel;
+      EndIf;
    EndIf;
 
    % Orbit-averaged di/dt of a sign(cos u) out-of-plane thrust: (2/pi) fN / v
