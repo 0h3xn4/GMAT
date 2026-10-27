@@ -20,18 +20,19 @@
 %        A_N = a * sqrt( di^2 + (sin(i) * dRAAN)^2 )  =  NAmp
 %
 %  ASSUMPTIONS (all editable below)
-%     600 km circular SSO, LTAN 10:30, start 01 Jan 2027, 5 years (1826 days)
-%     2 identical 51 kg satellites (50 kg dry + 1 kg propellant), Cd 2.2;
-%     Sat2 has 10 % more drag area (0.55 vs 0.5 m^2) to exercise the
+%     560 km circular SSO, LTAN 10:30, start 01 Jan 2027, 5 years (1826 days)
+%     2 identical 400 kg satellites (395 kg dry + 5 kg propellant), Cd 2.2;
+%     Sat2 has 10 % more drag area (2.2 vs 2.0 m^2) to exercise the
 %     differential-drag control
-%     FEEP: 1 mN per thruster, Isp 3000 s, one prograde and two out-of-plane
-%     (+N / -N) thrusters per satellite, power never limits thrust
+%     FEEP: 4 mN per thruster (a cluster of four 1 mN heads), Isp 3000 s, one
+%     prograde and two out-of-plane (+N / -N) thrusters per satellite, power
+%     never limits thrust
 %     Gravity 8x8, Sun + Moon, SRP, NRLMSISE-00 drag with the Schatten
 %     nominal solar-cycle prediction
 %     The satellites start in their formation slots (launcher / acquisition
 %     manoeuvres are not in the budget)
 %
-%  CONTROL (one cycle = 15 orbits, about 1.009 day)
+%  CONTROL (one cycle = 15 orbits, about 1.000 day)
 %     1. Altitude : each satellite tracks a target mean SMA with a PI law on
 %                   continuous prograde thrust (drag make-up; the integral
 %                   term learns the drag acceleration).
@@ -69,7 +70,9 @@
 %        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
 %        epMax               : largest epoch difference between the satellites, s
 %
-%  REFERENCE RESULTS (GMAT R2026a, 5 years, delta-V in m/s)
+%  REFERENCE RESULTS below are from the earlier 600 km, 51 kg, 1 mN case and are
+%  being re-run for the current 560 km, 400 kg, 4 mN parameters.
+%  (GMAT R2026a, 5 years, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
 %   HoldSSO = 0 (default: the orbit plane is allowed to drift)
 %     Schatten nominal              2.5        0.0        2.7        4.5        9.7
@@ -103,17 +106,17 @@ Sat1.DateFormat       = UTCGregorian;
 Sat1.Epoch            = '01 Jan 2027 00:00:00.000';
 Sat1.CoordinateSystem = EarthTOD;
 Sat1.DisplayStateType = BrouwerMeanShort;
-Sat1.BrouwerShortSMA  = 6978.137;
+Sat1.BrouwerShortSMA  = 6938.137;
 Sat1.BrouwerShortECC  = 0.0012;
 Sat1.BrouwerShortINC  = 97.7876;
 Sat1.BrouwerShortRAAN = 258.7256;
 Sat1.BrouwerShortAOP  = 90;
 Sat1.BrouwerShortMA   = 0;
-Sat1.DryMass          = 50;
+Sat1.DryMass          = 395;
 Sat1.Cd               = 2.2;
 Sat1.Cr               = 1.3;
-Sat1.DragArea         = 0.5;
-Sat1.SRPArea          = 0.5;
+Sat1.DragArea         = 2.0;
+Sat1.SRPArea          = 2.0;
 Sat1.Tanks            = {Tank1};
 Sat1.Thrusters        = {FeepT1, FeepNp1, FeepNm1};
 Sat1.PowerSystem      = FeepPower;
@@ -123,17 +126,17 @@ Sat2.DateFormat       = UTCGregorian;
 Sat2.Epoch            = '01 Jan 2027 00:00:00.000';
 Sat2.CoordinateSystem = EarthTOD;
 Sat2.DisplayStateType = BrouwerMeanShort;
-Sat2.BrouwerShortSMA  = 6978.137;
+Sat2.BrouwerShortSMA  = 6938.137;
 Sat2.BrouwerShortECC  = 0.0012;
 Sat2.BrouwerShortINC  = 97.7876;
 Sat2.BrouwerShortRAAN = 258.7256;
 Sat2.BrouwerShortAOP  = 90;
 Sat2.BrouwerShortMA   = 0;
-Sat2.DryMass          = 50;
+Sat2.DryMass          = 395;
 Sat2.Cd               = 2.2;
 Sat2.Cr               = 1.3;
-Sat2.DragArea         = 0.55;
-Sat2.SRPArea          = 0.55;
+Sat2.DragArea         = 2.2;
+Sat2.SRPArea          = 2.2;
 Sat2.Tanks            = {Tank2};
 Sat2.Thrusters        = {FeepT2, FeepNp2, FeepNm2};
 Sat2.PowerSystem      = FeepPower;
@@ -154,11 +157,11 @@ FeepPower.BusCoeff3       = 0;
 
 Create ElectricTank Tank1;
 Tank1.AllowNegativeFuelMass = false;
-Tank1.FuelMass              = 1;
+Tank1.FuelMass              = 5;
 
 Create ElectricTank Tank2;
 Tank2.AllowNegativeFuelMass = false;
-Tank2.FuelMass              = 1;
+Tank2.FuelMass              = 5;
 
 % The out-of-plane thrusters fire along +/-Y, the default SecondDirection of GMAT
 % hardware, which makes it print a harmless 'collinear' message at start-up; the
@@ -181,7 +184,7 @@ FeepT1.GravitationalAccel = 9.81;
 FeepT1.ThrustModel        = ConstantThrustAndIsp;
 FeepT1.MaximumUsablePower = 0.5;
 FeepT1.MinimumUsablePower = 0.001;
-FeepT1.ConstantThrust     = 0.001;
+FeepT1.ConstantThrust     = 0.004;
 FeepT1.Isp                = 3000;
 
 Create ElectricThruster FeepNp1;
@@ -201,7 +204,7 @@ FeepNp1.GravitationalAccel = 9.81;
 FeepNp1.ThrustModel        = ConstantThrustAndIsp;
 FeepNp1.MaximumUsablePower = 0.5;
 FeepNp1.MinimumUsablePower = 0.001;
-FeepNp1.ConstantThrust     = 0.001;
+FeepNp1.ConstantThrust     = 0.004;
 FeepNp1.Isp                = 3000;
 
 Create ElectricThruster FeepNm1;
@@ -221,7 +224,7 @@ FeepNm1.GravitationalAccel = 9.81;
 FeepNm1.ThrustModel        = ConstantThrustAndIsp;
 FeepNm1.MaximumUsablePower = 0.5;
 FeepNm1.MinimumUsablePower = 0.001;
-FeepNm1.ConstantThrust     = 0.001;
+FeepNm1.ConstantThrust     = 0.004;
 FeepNm1.Isp                = 3000;
 
 % Satellite 2: identical thruster set
@@ -239,7 +242,7 @@ FeepT2.GravitationalAccel = 9.81;
 FeepT2.ThrustModel        = ConstantThrustAndIsp;
 FeepT2.MaximumUsablePower = 0.5;
 FeepT2.MinimumUsablePower = 0.001;
-FeepT2.ConstantThrust     = 0.001;
+FeepT2.ConstantThrust     = 0.004;
 FeepT2.Isp                = 3000;
 
 Create ElectricThruster FeepNp2;
@@ -259,7 +262,7 @@ FeepNp2.GravitationalAccel = 9.81;
 FeepNp2.ThrustModel        = ConstantThrustAndIsp;
 FeepNp2.MaximumUsablePower = 0.5;
 FeepNp2.MinimumUsablePower = 0.001;
-FeepNp2.ConstantThrust     = 0.001;
+FeepNp2.ConstantThrust     = 0.004;
 FeepNp2.Isp                = 3000;
 
 Create ElectricThruster FeepNm2;
@@ -279,7 +282,7 @@ FeepNm2.GravitationalAccel = 9.81;
 FeepNm2.ThrustModel        = ConstantThrustAndIsp;
 FeepNm2.MaximumUsablePower = 0.5;
 FeepNm2.MinimumUsablePower = 0.001;
-FeepNm2.ConstantThrust     = 0.001;
+FeepNm2.ConstantThrust     = 0.004;
 FeepNm2.Isp                = 3000;
 
 %----------------------------------------
@@ -438,13 +441,13 @@ HoldSSO     = 0;         % 1 = also hold the sun-synchronous inclination (and so
                          % 0 = no absolute inclination control: the orbit plane may
                          %     drift, only the formation geometry is kept
 MissionDays = 1826;      % 5 years incl. one leap day (2028)
-CycleOrbits = 15;        % control cycle = 15 nodal periods (~1.009 day)
+CycleOrbits = 15;        % control cycle = 15 nodal periods (~1.000 day)
 
 % Reference mean orbit (Brouwer-Lyddane "short" mean elements, true-of-date)
-aRef    = 6978.137;      % km, 600 km altitude
+aRef    = 6938.137;      % km, 560 km altitude
 eRef    = 0.0012;        % frozen-orbit eccentricity
 aopRef  = 90;            % deg, frozen-orbit argument of perigee
-iRef    = 97.808;        % deg, tuned for exactly sun-synchronous nodal rate
+iRef    = 97.653;        % deg, tuned for exactly sun-synchronous nodal rate
 raanRef = 258.7256;      % deg, LTAN 10:30 at 01 Jan 2027 (centre of the pair)
 
 % Formation requirement (Sat2 relative to Sat1, RTN)
@@ -458,14 +461,14 @@ VtolT   = 0.4;           % km/day, tolerance on the commanded drift rate
 kappaT  = 0.3;           % fraction of the needed SMA change commanded per cycle
 
 % FEEP assumptions (ThrustN must equal ConstantThrust above, Isp0 the Isp)
-ThrustN = 0.001;         % N per thruster
+ThrustN = 0.004;         % N per thruster (a cluster of four 1 mN FEEP heads)
 Isp0    = 3000;          % s
 g0      = 9.81;          % m/s^2, same value as the thrusters' GravitationalAccel
 
 % Controller tuning
 tauA    = 129600;        % s, altitude loop time constant (1.5 day)
 tauI    = 1296000;       % s, altitude loop integral time (15 day, overdamped)
-ffInit  = 2.0e-7;        % m/s^2, first guess of the drag make-up acceleration
+ffInit  = 1.0e-7;        % m/s^2, first guess of the drag make-up acceleration
 iDead   = 0.01;          % deg, start an inclination campaign above this error
 iTol    = 0.0005;        % deg, a campaign ends when the commanded change left is below this
 iAim    = 0.005;         % deg, a campaign aims this far past the reference (against the drift)

@@ -2,7 +2,7 @@
 """Plots and a delta-V budget summary from Ex_FormationFlying_SSO_FEEP.script.
 
 GMAT writes two files per run into its output folder:
-    FormationSSO_FEEP_Daily.txt      one row per control cycle (about 1.009 day)
+    FormationSSO_FEEP_Daily.txt      one row per control cycle (about 1.000 day)
     FormationSSO_FEEP_Summary.txt    delta-V budget and compliance counters
 
 Usage
@@ -844,7 +844,7 @@ def main(argv=None):
                     help="smallest allowed 3-D separation, km")
     ap.add_argument("--margin", type=float, default=0.20, help="delta-V margin")
     ap.add_argument("--isp", type=float, default=3000, help="thruster Isp, s")
-    ap.add_argument("--thrust", type=float, default=0.001,
+    ap.add_argument("--thrust", type=float, default=0.004,
                     help="thrust per thruster, N (for the firing-time estimate)")
     ap.add_argument("--theme", choices=["light", "dark"], default="light")
     ap.add_argument("--show", action="store_true", help="open the figures")
