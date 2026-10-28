@@ -687,9 +687,13 @@ Sat2.BrouwerShortINC  = iRef;
 Sat2.BrouwerShortRAAN = raanRef + 0.5 * dRaan;
 Sat2.BrouwerShortAOP  = aopRef;
 Sat2.BrouwerShortMA   = du0;
-% Acquisition start: Sat2 is released at exactly the position of Sat1
+% Acquisition start: both satellites are released at the same position, on the
+% node of the centre of the formation. The acquisition moves the nodes of the two
+% satellites apart symmetrically, to raanRef -/+ dRaan/2, so the LTAN of the pair
+% centre stays at the reference.
 If acq == 1
-   Sat2.BrouwerShortRAAN = raanRef - 0.5 * dRaan;
+   Sat1.BrouwerShortRAAN = raanRef;
+   Sat2.BrouwerShortRAAN = raanRef;
    Sat2.BrouwerShortMA   = 0;
 EndIf;
 

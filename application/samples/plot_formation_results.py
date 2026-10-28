@@ -174,6 +174,10 @@ class Run:
                          2: self.ltan_minutes(d["raanM2"])}
         dr = d["raanM2"] - d["raanM1"]
         self.draan = (dr + 180) % 360 - 180
+        # local time of the node of the centre of the pair (the acquisition moves
+        # the two nodes apart symmetrically, so each satellite alone swings by half
+        # of the node offset)
+        self.ltan_centre = self.ltan_minutes(d["raanM1"] + self.draan / 2)
 
     def ltan_minutes(self, raan):
         """Local time of the ascending node relative to its start, minutes.
@@ -351,7 +355,7 @@ def compliance(run):
     out["AN_lo"], out["AN_hi"] = lo, hi
     out["rng_min"] = float(run.rng[i0:].min())
     out["rng_ok"] = out["rng_min"] >= a.min_range
-    out["ltan_max"] = float(np.abs(run.ltan_dev[1]).max())
+    out["ltan_max"] = float(np.abs(run.ltan_centre).max())
     out["inc_change"] = float(run.inc[1][-2] - run.inc[1][0])
     out["alt_change"] = float(run.alt[1][-2] - run.alt[1][0])
     out["ok"] = out["T_ok"] and out["AN_ok"] and out["rng_ok"]
@@ -988,7 +992,7 @@ def summary_text(run, comp):
       f"{'PASS' if comp['AN_ok'] else 'FAIL'}, {comp['AN_in_frac']*100:.1f} % inside")
     w(f"- Closest approach {comp['rng_min']:.0f} km (minimum allowed "
       f"{a.min_range:.0f} km): {'PASS' if comp['rng_ok'] else 'FAIL'}")
-    w(f"- Orbit plane: inclination {comp['inc_change']:+.3f} deg, LTAN up to "
+    w(f"- Orbit plane: inclination {comp['inc_change']:+.3f} deg, LTAN of the pair centre up to "
       f"{comp['ltan_max']:.1f} min from the start, altitude {comp['alt_change']:+.2f} km")
     w("")
     w("## Checks on the run itself")
