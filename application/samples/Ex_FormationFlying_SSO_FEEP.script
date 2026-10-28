@@ -21,9 +21,8 @@
 %
 %  ASSUMPTIONS (all editable below)
 %     560 km circular SSO, LTAN 10:30, start 01 Jan 2027, 5 years (1826 days)
-%     2 identical 400 kg satellites (395 kg dry + 5 kg propellant), Cd 2.2;
-%     Sat2 has 10 % more drag area (2.2 vs 2.0 m^2) to exercise the
-%     differential-drag control
+%     2 identical 400 kg satellites (395 kg dry + 5 kg propellant), Cd 3.0,
+%     drag area 4.5 m^2 each (SRP area 4.5 m^2, Cr 1.3)
 %     FEEP: 4 mN per thruster (a cluster of four 1 mN heads), Isp 3000 s, one
 %     prograde and two out-of-plane (+N / -N) thrusters per satellite, power
 %     never limits thrust
@@ -113,10 +112,10 @@ Sat1.BrouwerShortRAAN = 258.7256;
 Sat1.BrouwerShortAOP  = 90;
 Sat1.BrouwerShortMA   = 0;
 Sat1.DryMass          = 395;
-Sat1.Cd               = 2.2;
+Sat1.Cd               = 3.0;
 Sat1.Cr               = 1.3;
-Sat1.DragArea         = 2.0;
-Sat1.SRPArea          = 2.0;
+Sat1.DragArea         = 4.5;
+Sat1.SRPArea          = 4.5;
 Sat1.Tanks            = {Tank1};
 Sat1.Thrusters        = {FeepT1, FeepNp1, FeepNm1};
 Sat1.PowerSystem      = FeepPower;
@@ -133,10 +132,10 @@ Sat2.BrouwerShortRAAN = 258.7256;
 Sat2.BrouwerShortAOP  = 90;
 Sat2.BrouwerShortMA   = 0;
 Sat2.DryMass          = 395;
-Sat2.Cd               = 2.2;
+Sat2.Cd               = 3.0;
 Sat2.Cr               = 1.3;
-Sat2.DragArea         = 2.2;
-Sat2.SRPArea          = 2.2;
+Sat2.DragArea         = 4.5;
+Sat2.SRPArea          = 4.5;
 Sat2.Tanks            = {Tank2};
 Sat2.Thrusters        = {FeepT2, FeepNp2, FeepNm2};
 Sat2.PowerSystem      = FeepPower;
