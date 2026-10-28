@@ -117,31 +117,32 @@
 %  start 01 Jan 2027 with both satellites at the same point, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
 %   HoldSSO = 0 (default: the orbit plane is allowed to drift)
-%     +2 sigma, 95th percentile      9.6        0.0        9.6       45.0       64.2
-%     Schatten nominal               7.0        0.0        7.0       45.0       59.0
+%     +2 sigma, 95th percentile      9.6       22.4        9.6       22.4       63.9
+%     Schatten nominal               7.0       22.4        7.0       22.4       58.8
 %   HoldSSO = 1 (sun-synchronous inclination and LTAN held)
-%     +2 sigma, 95th percentile      9.7       32.5        9.7       73.0      124.9
-%     Schatten nominal               7.0       32.4        7.1       72.9      119.5
-%   tang = altitude + along-track, norm = inclination / node control. The
-%   totals include the acquisition: 155 days, 46.2 m/s for the formation at +2 sigma
-%   (Sat1 2.1, Sat2 44.1; 44.9 at the nominal activity). With diAcq = 0.05 deg it
-%   takes 270 days and 25.6 m/s, with 0.20 deg 115 days and 85.8 m/s (nominal).
+%     +2 sigma, 95th percentile      9.7       53.2        9.7       51.5      124.1
+%     Schatten nominal               7.1       53.1        7.1       51.4      118.7
+%   tang = altitude + along-track, norm = inclination / node control. Both satellites
+%   share the relative inclination changes, so they use the same delta-V and about
+%   the same propellant (0.43 / 0.44 kg with HoldSSO = 0, 0.85 / 0.83 kg with
+%   HoldSSO = 1; 5 kg tanks). The totals include the acquisition: 143 days, 45.5
+%   m/s for the formation at +2 sigma (22.7 per satellite; 44.3 at the nominal
+%   activity). With diAcq = 0.05 deg it takes 267 days and 25.3 m/s, with 0.20 deg
+%   90 days and 84.8 m/s (nominal).
 %   End of life, each satellite, not in the figures above: clearance 2.7 + disposal
 %   52.0 m/s down to 460 km, 0.74 kg of propellant, and a natural decay of 2.0
-%   years (limit 5 years; 4.4 years for the worst of the end-of-life epochs
+%   years (limit 5 years; 4.35 years for the worst of the end-of-life epochs
 %   2031 ... 2041, see formation_eol_lifetime.py).
 %   Launch delay (HoldSSO = 0, +2 sigma, formation delta-V without end of life):
-%   1 year 61.5, 2 years 76.7, 3 years 111.7, 4 years 153.5, 5 years 186.6 m/s.
-%   After the acquisition the along-track separation stays within 320..601 km (limit
-%   50..1000 km) and the N amplitude within 198..206 km in all cases. Propellant in
-%   the mission: 0.13 / 0.74 kg (Sat1 / Sat2) with HoldSSO = 0, 0.57 / 1.12 kg with
-%   HoldSSO = 1 (5 kg tanks).
+%   1 year 63.2, 2 years 76.5, 3 years 111.6, 4 years 153.4, 5 years 187.4 m/s.
+%   After the acquisition the along-track separation stays within 317..595 km (limit
+%   50..1000 km) and the N amplitude within 198..206 km in all cases.
 %   With HoldSSO = 0 the inclination falls from 97.65 to 97.47 deg (Sun and Moon)
-%   and the LTAN drifts from 10:30 to about 09:10 over the 5 years; with
-%   HoldSSO = 1 the LTAN of Sat1 stays within 0.6 min. Without any control the
-%   same pair (started in its slots, ControlOn = 0) loses 7.8 km of altitude in
-%   year 1, leaves the along-track corridor after 152 days and the N-amplitude band
-%   after 702 days, and the LTAN slips by about 30 min.
+%   and the LTAN of the pair drifts from 10:30 to about 09:12 over the 5 years; with
+%   HoldSSO = 1 the LTAN of the pair centre stays within 0.6 min. Without any
+%   control the same pair (started in its slots, ControlOn = 0) loses 7.8 km of
+%   altitude in year 1, leaves the along-track corridor after 152 days and the
+%   N-amplitude band after 702 days, and the LTAN slips by about 30 min.
 %
 %  Run time is about 40 min in GmatConsole: about 1 s per simulated day in
 %  operations (more during the acquisition), then the end-of-life lifetime check.
