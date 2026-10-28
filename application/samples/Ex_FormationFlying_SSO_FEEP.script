@@ -525,7 +525,7 @@ Create Variable AcqOn VAcq TLeadAcq diAcq acq acqT acqN zeroA tAcq dvAcq1 dvAcq2
 Create Variable LaunchDelayDays A1Mod0 raanTmp EolOn dAClear HDisp CdEol LifeMaxDays HReentry;
 Create Variable aEol1 aEol2 aClearT1 aClearT2 aDispT aNow1 aNow2 iEol nNowE dAday dRemE dutyE dvStep t0Eol;
 Create Variable dvClr1 dvClr2 dvDisp1 dvDisp2 life1 life2 hEnd1 hEnd2 mEolA1 mEolA2 mEolB1 mEolB2;
-Create Variable aPrev aLoC fracC mPropEol1 mPropEol2 dvRktEol1 dvRktEol2;
+Create Variable massPre massPost aPrev aLoC fracC mPropEol1 mPropEol2 dvRktEol1 dvRktEol2;
 Create Variable dvAcqT1 dvAcqN1 dvAcqT2 dvAcqN2 dvNo1 dvNo2 dvNf1 dvNf2 dvN1pre dvN2pre dNinc1 dNinc2;
 Create Variable kOm vCircA diMaxA diNow absDiNow diEnd tRampD dFut dPred TStopUp useAbs;
 
@@ -1418,6 +1418,13 @@ If EolOn == 1
    If ControlOn == 1
       Sat1.Cd = CdEol;
       Sat2.Cd = CdEol;
+      % The operational thrusters keep the duty of the last cycle: switch them off
+      Sat1.FeepT1.DutyCycle  = 0;
+      Sat1.FeepNp1.DutyCycle = 0;
+      Sat1.FeepNm1.DutyCycle = 0;
+      Sat2.FeepT2.DutyCycle  = 0;
+      Sat2.FeepNp2.DutyCycle = 0;
+      Sat2.FeepNm2.DutyCycle = 0;
 
       aEol1    = Sat1.EarthTOD.BrouwerShortSMA;
       aClearT1 = aEol1 - dAClear;
@@ -1433,10 +1440,12 @@ If EolOn == 1
             dutyE = 1;
          EndIf;
          Sat1.FeepR1.DutyCycle = dutyE;
+         massPre = Sat1.TotalMass;
          BeginFiniteBurn Burn1(Sat1);
          Propagate EolProp(Sat1) {Sat1.ElapsedSecs = 86400};
          EndFiniteBurn Burn1(Sat1);
-         dvStep = dutyE * fMax1 * 86400;
+         massPost = Sat1.TotalMass;
+         dvStep = dutyE * ThrustN * 86400 / (0.5 * (massPre + massPost));
          % share of this day's thrust spent above the clearance level
          aPrev  = aNow1;
          aNow1 = Sat1.EarthTOD.BrouwerShortSMA;
@@ -1469,10 +1478,12 @@ If EolOn == 1
             dutyE = 1;
          EndIf;
          Sat2.FeepR2.DutyCycle = dutyE;
+         massPre = Sat2.TotalMass;
          BeginFiniteBurn Burn2(Sat2);
          Propagate EolProp(Sat2) {Sat2.ElapsedSecs = 86400};
          EndFiniteBurn Burn2(Sat2);
-         dvStep = dutyE * fMax2 * 86400;
+         massPost = Sat2.TotalMass;
+         dvStep = dutyE * ThrustN * 86400 / (0.5 * (massPre + massPost));
          % share of this day's thrust spent above the clearance level
          aPrev  = aNow2;
          aNow2 = Sat2.EarthTOD.BrouwerShortSMA;

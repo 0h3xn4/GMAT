@@ -243,7 +243,7 @@ def shade_acq(ax, run):
     if run.i_ops > 0:
         ax.axvspan(run.dates[0], run.dates[run.i_ops], color=C["muted"], alpha=0.13,
                    lw=0, zorder=0)
-        ax.text(run.dates[run.i_ops], 0.03, "acquisition ends ", ha="right", va="bottom",
+        ax.text(run.dates[run.i_ops], 0.10, "acquisition ends ", ha="right", va="bottom",
                 transform=ax.get_xaxis_transform(), fontsize=7.5, color=C["ink2"])
 
 
@@ -442,9 +442,10 @@ def fig_dv(run, outdir, show):
              fontweight="bold", ha="left")
     tot = run.dv_total
     marg = tot * (1 + a.margin)
-    fig.text(0.08, 0.92, f"Formation total {tot:.1f} m/s  →  {marg:.1f} m/s with "
-             f"{a.margin*100:.0f} % margin  (Sat1 {sum(run.dv_final[1].values()):.1f}, "
-             f"Sat2 {sum(run.dv_final[2].values()):.1f} m/s before margin)",
+    marg_txt = (f"  →  {marg:.1f} m/s with {a.margin*100:.0f} % margin" if a.margin else "")
+    fig.text(0.08, 0.92, f"Formation total {tot:.1f} m/s{marg_txt}  "
+             f"(Sat1 {sum(run.dv_final[1].values()):.1f}, "
+             f"Sat2 {sum(run.dv_final[2].values()):.1f} m/s)",
              fontsize=10, color=C["ink"], ha="left")
     fig.text(0.08, 0.895, "tangential = altitude + along-track control;  normal = "
              "inclination / node control" + (
