@@ -27,7 +27,15 @@ Figures (one PNG each)
     06_comparison     Only with 2+ runs: budgets and trends side by side
 
 It also prints the budget table and the compliance verdict, and writes them to
-OUTDIR/<label>/budget_summary.md.
+OUTDIR/<label>/budget_summary.md. The budget follows the ESA guidelines
+EOP-FM/2024-07-177 (AD10): Table 1 with the beginning-of-life, nominal-operations
+and end-of-life contributors, the margin policy of its Sec. 5.6, the residual
+(1 %) and uncertainty (2 %) of the tank load of Sec. 5.8 and the iteration of
+Sec. 6.5 on the propellant mass. Contributors that GMAT does not simulate
+(launcher injection errors, collision avoidance, thruster attitude control) are
+inputs: --lie-ip, --lie-oop, --n-cam, --acbt-dv; they are marked "not provided"
+while they are zero. The end-of-life lifetime and the separation after release
+are checked against ESSB-ST-U-007 (5.4.2.3, 5.3.3.2, 5.3.3.4).
 
 Needs numpy and matplotlib only.
 """
@@ -147,6 +155,7 @@ class Run:
         # acq = 1 are the phasing manoeuvre, compliance is judged after it.
         self.acq = d["acq"] if "acq" in d else np.zeros(len(self.t))
         after = np.where(self.acq < 0.5)[0]
+        self.acq_done = bool(after.size)
         self.i_ops = int(after[0]) if after.size else len(self.t) - 1
         self.t_acq = float(self.t[self.i_ops]) if self.i_ops > 0 else 0.0
         self.dv_acq = {s: {c: float(v[self.i_ops]) if self.i_ops > 0 else 0.0
@@ -324,7 +333,7 @@ def finish(fig, path, show):
 # ----------------------------------------------------------------------------
 def compliance(run):
     a = run.args
-    i0 = run.i_ops                  # compliance is judged after the acquisition
+    i0 = run.i_ops if run.acq_done else 0   # judged after the acquisition
     T = run.T[i0:]
     out = {}
     inside = (T >= a.t_min) & (T <= a.t_max)
@@ -775,8 +784,135 @@ def fig_compare(runs, outdir, show):
 
 
 # ----------------------------------------------------------------------------
+# AD10 (EOP-FM/2024-07-177) delta-V and propellant mass budget
+# ----------------------------------------------------------------------------
+def ad10_budget(run):
+    """Table 1 of AD10 for both satellites. Returns (rows, totals, notes)."""
+    a = run.args
+    s = run.s
+    g = lambda k: float(s.get(k, 0.0))
+    n_mean = math.sqrt(398600.4415 / 6938.137 ** 3)             # rad/s, ~ operational orbit
+    if "aAvg1" in run.d:
+        n_mean = math.sqrt(398600.4415 / float(np.nanmean(run.d["aAvg1"])) ** 3)
+    cam_each = n_mean * 100.0               # m/s: +100 m SMA then -100 m (AD10 6.2.4)
+    acq = {1: g("dvAcqT1") + g("dvAcqN1"), 2: g("dvAcqT2") + g("dvAcqN2")}
+    tang = {1: run.dv_final[1]["tang"] - g("dvAcqT1"), 2: run.dv_final[2]["tang"] - g("dvAcqT2")}
+    oop = {1: g("dvNo1"), 2: g("dvNo2")}
+    form = {1: g("dvNf1"), 2: g("dvNf2")}
+    reacq = {k: a.n_reacq * acq[k] for k in (1, 2)}
+    cam = {k: a.n_cam * 4 * cam_each for k in (1, 2)}      # factor 4 on the number of CAM
+    clr = {1: g("dvClr1"), 2: g("dvClr2")}
+    disp = {1: g("dvDisp1"), 2: g("dvDisp2")}
+    # (phase, contributor, dv Sat1, dv Sat2, propellant factor, source)
+    rows = [
+        ("BOL", "Launcher injection errors, in-plane", a.lie_ip, a.lie_ip, 1, "input" if a.lie_ip else "not provided"),
+        ("BOL", "Launcher injection errors, out-of-plane", a.lie_oop, a.lie_oop, 1, "input" if a.lie_oop else "not provided"),
+        ("BOL", "Orbit acquisition (formation phasing)", acq[1], acq[2], 1, "GMAT"),
+        ("OP", "Orbit transfers", 0.0, 0.0, 1, "n/a"),
+        ("OP", "In-plane orbit control", tang[1], tang[2], 1, "GMAT"),
+        ("OP", "Out-of-plane orbit control", oop[1], oop[2], 1, "GMAT"),
+        ("OP", "Formation maintenance", form[1], form[2], 1, "GMAT"),
+        ("OP", f"Formation re-acquisition ({a.n_reacq:g} x acquisition)", reacq[1], reacq[2], 1, "assumed"),
+        ("OP", f"Collision avoidance ({a.n_cam:g} CAM x 4 margin)", cam[1], cam[2], 1,
+         "input" if a.n_cam else "not provided"),
+        ("OP", "Attitude control by thrusters (+100 % propellant)", a.acbt_dv, a.acbt_dv, 2,
+         "input" if a.acbt_dv else "not provided"),
+        ("EOL", "Clearance of the operational orbit", clr[1], clr[2], 1, "GMAT" if "dvClr1" in s else "missing"),
+        ("EOL", "Disposal (uncontrolled re-entry)", disp[1], disp[2], 1, "GMAT" if "dvDisp1" in s else "missing"),
+    ]
+    ve = a.eta * a.isp * 9.80665
+    totals = {}
+    for sat in (1, 2):
+        dry = run.d[f"mass{sat}"][0] - a.tank_kg
+        mp = a.tank_kg                                   # initial guess: the tank load
+        for _ in range(100):
+            m = dry + mp
+            props = []
+            for ph, name, d1, d2, fac, src in rows:
+                dv = d1 if sat == 1 else d2
+                dm = fac * m * (1 - math.exp(-dv / ve))
+                props.append(dm)
+                m -= dm
+            res, unc = 0.01 * a.tank_kg, 0.02 * a.tank_kg
+            new = sum(props) + res + unc
+            if abs(new - mp) < 1e-6:
+                mp = new
+                break
+            mp = new
+        totals[sat] = dict(props=props, res=res, unc=unc, mp=mp, dry=dry,
+                           dv=sum((r[2] if sat == 1 else r[3]) for r in rows))
+    notes = []
+    for ph, name, d1, d2, fac, src in rows:
+        if src == "not provided":
+            notes.append(f"{name}: not provided (zero in the totals)")
+    return rows, totals, notes
+
+
+def ad10_text(run):
+    a = run.args
+    rows, tot, notes = ad10_budget(run)
+    w = []
+    w.append("## Delta-V and propellant mass budget (EOP-FM/2024-07-177, Table 1)")
+    w.append("")
+    w.append("Margin policy of AD10 5.6: none, except 4x on the number of collision-"
+             "avoidance manoeuvres, +100 % on the propellant of thruster attitude "
+             "control, and the residual (1 %) and uncertainty (2 %) of the tank load.")
+    w.append("")
+    w.append("| phase | contributor | dV Sat1 [m/s] | dV Sat2 [m/s] | m_p Sat1 [g] | m_p Sat2 [g] | source |")
+    w.append("|---|---|---:|---:|---:|---:|---|")
+    for i, (ph, name, d1, d2, fac, src) in enumerate(rows):
+        w.append(f"| {ph} | {name} | {d1:.2f} | {d2:.2f} | "
+                 f"{tot[1]['props'][i]*1000:.0f} | {tot[2]['props'][i]*1000:.0f} | {src} |")
+    w.append(f"| | Propellant residual (1 % of {a.tank_kg:g} kg) | | | "
+             f"{tot[1]['res']*1000:.0f} | {tot[2]['res']*1000:.0f} | AD10 5.8 |")
+    w.append(f"| | Propellant uncertainty, gauging (2 % of {a.tank_kg:g} kg) | | | "
+             f"{tot[1]['unc']*1000:.0f} | {tot[2]['unc']*1000:.0f} | AD10 5.8 |")
+    w.append(f"| | **Total** | **{tot[1]['dv']:.2f}** | **{tot[2]['dv']:.2f}** | "
+             f"**{tot[1]['mp']*1000:.0f}** | **{tot[2]['mp']*1000:.0f}** | |")
+    w.append("")
+    w.append(f"Formation total {tot[1]['dv']+tot[2]['dv']:.2f} m/s and "
+             f"{(tot[1]['mp']+tot[2]['mp']):.3f} kg of propellant (Isp {a.isp:g} s, "
+             f"efficiency eta {a.eta:g}, dry mass {tot[1]['dry']:.0f} kg, iterated as in "
+             f"AD10 6.5).")
+    fits = all(t["mp"] <= a.tank_kg for t in tot.values())
+    w.append(f"Tank of {a.tank_kg:g} kg: {'PASS' if fits else 'FAIL'} "
+             f"(largest need {max(t['mp'] for t in tot.values()):.3f} kg).")
+    if a.margin:
+        w.append(f"Additional programme margin requested: {a.margin*100:.0f} % on "
+                 f"the total delta-V = {(tot[1]['dv']+tot[2]['dv'])*(1+a.margin):.2f} m/s.")
+    if notes:
+        w.append("")
+        for n in notes:
+            w.append(f"- INPUT NEEDED: {n}")
+    w.append("")
+    return w
+
+
+# ----------------------------------------------------------------------------
 # Text summary
 # ----------------------------------------------------------------------------
+def esa_checks(run):
+    """Checks against ESSB-ST-U-007 that can be made from the run files."""
+    s = run.s
+    out = []
+    t = run.t
+    if run.i_ops > 0 or True:
+        # 5.3.3.2.a / 5.3.3.4: separation of the two satellites after the release
+        for day in (1, 3, 7):
+            if t[-1] > day:
+                out.append((f"Separation {day} d after release", float(np.interp(day, t, run.rng)), "km"))
+    if "life1" in s:
+        for sat in (1, 2):
+            life = s[f"life{sat}"]
+            out.append((f"Orbit lifetime after disposal, Sat{sat}",
+                        life / 365.25, "years"))
+        ok = all(s[f"life{k}"] < 1826 and s.get(f"hEnd{k}", 0) <= 125 for k in (1, 2))
+        out.append(("Natural decay < 5 years from the end of life (5.4.2.3.a.1)",
+                    "PASS" if ok else "FAIL", ""))
+        out.append(("Disposal orbit mean altitude", (s["aDispT"] - 6378.1363), "km"))
+    return out
+
+
 def summary_text(run, comp):
     a = run.args
     lines = []
@@ -820,13 +956,27 @@ def summary_text(run, comp):
         w("Both satellites start at the same position; the acquisition builds the "
           "along-track and normal separation and is part of the totals above.")
     w("")
+    w("")
+    for line in ad10_text(run):
+        w(line)
+    w("## ESSB-ST-U-007 checks that can be made from this run")
+    w("")
+    for name, val, unit in esa_checks(run):
+        w(f"- {name}: {val:.1f} {unit}" if isinstance(val, float) else f"- {name}: {val}")
+    w("")
+    w("Not covered by the simulation (see the compliance note next to the script): "
+      "probability of unintentional contact (5.3.3.4), probability of successful "
+      "disposal and passivation (5.4.1.1, 5.3.2.2), collision probability until "
+      "re-entry (5.4.2.3.a.2), re-entry casualty risk (5.5).")
+    w("")
     w("Per mission year (formation, m/s): " + ", ".join(
         f"Y{i+1} {r['tang']+r['norm']:.1f}" for i, r in enumerate(run.per_year_dv())))
     w("")
     w("## Compliance")
     w("")
     if run.i_ops > 0:
-        w(f"(Compliance is judged from day {run.t_acq:.0f}, after the acquisition.)")
+        w(f"(Compliance is judged from day {run.t_acq:.0f}, after the acquisition.)" if run.acq_done
+          else "(The acquisition was still running at the end of this run; compliance is judged over the whole run.)")
         w("")
     w(f"- Along-track {comp['T_min']:.0f}–{comp['T_max']:.0f} km "
       f"(limits {a.t_min:.0f}–{a.t_max:.0f}): "
@@ -890,7 +1040,24 @@ def main(argv=None):
                     help="allowed fractional error of the normal amplitude")
     ap.add_argument("--min-range", type=float, default=10,
                     help="smallest allowed 3-D separation, km")
-    ap.add_argument("--margin", type=float, default=0.20, help="delta-V margin")
+    ap.add_argument("--margin", type=float, default=0.0,
+                    help="additional programme margin on the delta-V; AD10 5.6 "
+                         "prescribes none (default 0)")
+    ap.add_argument("--lie-ip", type=float, default=0.0,
+                    help="launcher injection errors, in-plane delta-V per satellite, m/s (AD10 6.1.1)")
+    ap.add_argument("--lie-oop", type=float, default=0.0,
+                    help="launcher injection errors, out-of-plane delta-V per satellite, m/s")
+    ap.add_argument("--n-reacq", type=float, default=1.0,
+                    help="formation re-acquisitions after a contingency, each costing "
+                         "as much as the acquisition (AD10 6.2.5)")
+    ap.add_argument("--n-cam", type=float, default=0.0,
+                    help="collision-avoidance manoeuvres per satellite from a DRAMA "
+                         "run (AD10 6.2.4); 4x is applied, 0.109 m/s each at 560 km")
+    ap.add_argument("--acbt-dv", type=float, default=0.0,
+                    help="delta-V of thruster attitude control per satellite, m/s (100 %% propellant margin)")
+    ap.add_argument("--tank-kg", type=float, default=5.0,
+                    help="maximum propellant load of each tank, kg (AD10 5.8)")
+    ap.add_argument("--eta", type=float, default=1.0, help="thruster efficiency (AD10 5.11)")
     ap.add_argument("--isp", type=float, default=3000, help="thruster Isp, s")
     ap.add_argument("--thrust", type=float, default=0.004,
                     help="thrust per thruster, N (for the firing-time estimate)")

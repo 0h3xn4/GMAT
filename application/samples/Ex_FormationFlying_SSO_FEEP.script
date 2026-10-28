@@ -26,11 +26,23 @@
 %     FEEP: 4 mN per thruster (a cluster of four 1 mN heads), Isp 3000 s, one
 %     prograde and two out-of-plane (+N / -N) thrusters per satellite, power
 %     never limits thrust
-%     Gravity 8x8, Sun + Moon, SRP, NRLMSISE-00 drag with the Schatten
-%     nominal solar-cycle prediction
+%     Gravity 8x8, Sun + Moon, SRP, NRLMSISE-00 drag with the Schatten (MSFC)
+%     solar-cycle prediction: +2 sigma (the 95th percentile of AD10 5.9) for the
+%     beginning of life and the operations, nominal (50th percentile) at the end
+%     of life. Cd 3.0 during the operations and 2.2 at the end of life (AD10 5.2).
 %     AcqOn = 1 (default): both satellites are released at exactly the same
 %     position and the formation is built by a phasing manoeuvre (below); its
 %     delta-V is part of the budget. AcqOn = 0: they start in their slots.
+%
+%  STANDARDS
+%     The delta-V and propellant budget follows the ESA guidelines EOP-FM/2024-07-177
+%     (AD10): contributors per phase (Table 1), finite burns for electric
+%     propulsion, Cd, solar-activity percentiles, margin policy, 1 % residual and
+%     2 % uncertainty of the tank, iteration on the propellant mass (the last
+%     three in plot_formation_results.py). The end of life follows ESSB-ST-U-007
+%     (5.4.2.3: natural decay shorter than 5 years from the end of life). What this
+%     script covers and what needs other tools is listed in
+%     Ex_FormationFlying_SSO_FEEP_compliance.md.
 %
 %  CONTROL (one cycle = 15 orbits, about 1.000 day)
 %     1. Altitude : each satellite tracks a target mean SMA with a PI law on
@@ -62,6 +74,15 @@
 %                   job. Normal separation costs delta-V x time = const: a larger
 %                   diAcq is faster and costs proportionally more. Results are
 %                   judged (TMin/TMax, nOutT, ...) after the acquisition ends.
+%     4. End of life (EolOn = 1, after the last cycle): both satellites are
+%                   lowered with retrograde thrusters at full thrust: clearance of
+%                   the operational orbit (SMA drop of dAClear = 5 km, AD10 6.3.2),
+%                   then disposal to a mean altitude of HDisp. The natural decay
+%                   from there is propagated (Cd 2.2, 50th percentile) until
+%                   re-entry; it must be shorter than 5 years (ESSB-ST-U-007
+%                   5.4.2.3). formation_eol_lifetime.py repeats that check for
+%                   start epochs through a full solar cycle (ESSB 6.2.f) to choose
+%                   HDisp.
 %     The controller uses Brouwer-Lyddane mean elements referred to the
 %     true-of-date equator, averaged over the 15 orbits of the cycle.
 %
@@ -81,7 +102,12 @@
 %        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
 %        epMax               : largest epoch difference between the satellites, s
 %        tAcq                : day the acquisition ended (0 if AcqOn = 0)
-%        dvAcq1/dvAcq2/dvAcqTot : delta-V used up to then (included in dvT/dvN)
+%        dvAcqT/N1,2         : delta-V used up to then (included in dvT/dvN)
+%        dvNo1/2, dvNf1/2    : normal delta-V after the acquisition: sun-synchronous
+%                              hold (out-of-plane orbit control) / formation
+%        dvClr1/2, dvDisp1/2 : end of life: clearance, disposal, m/s (not in dvTot)
+%        aDispT, life1/2, hEnd1/2 : disposal SMA (km), days to re-entry, final altitude
+%        mPropEol, dvRktEol  : propellant and rocket-equation delta-V of the end of life
 %     The Daily file has a last column acq (1 while the acquisition runs).
 %
 %  REFERENCE RESULTS (GMAT R2026a, 560 km, 400 kg, 4 mN, Cd 3.0, 4.5 m^2, 5 years, delta-V in m/s)
@@ -133,7 +159,7 @@ Sat1.Cr               = 1.3;
 Sat1.DragArea         = 4.5;
 Sat1.SRPArea          = 4.5;
 Sat1.Tanks            = {Tank1};
-Sat1.Thrusters        = {FeepT1, FeepNp1, FeepNm1};
+Sat1.Thrusters        = {FeepT1, FeepNp1, FeepNm1, FeepR1};
 Sat1.PowerSystem      = FeepPower;
 
 Create Spacecraft Sat2;
@@ -153,7 +179,7 @@ Sat2.Cr               = 1.3;
 Sat2.DragArea         = 4.5;
 Sat2.SRPArea          = 4.5;
 Sat2.Tanks            = {Tank2};
-Sat2.Thrusters        = {FeepT2, FeepNp2, FeepNm2};
+Sat2.Thrusters        = {FeepT2, FeepNp2, FeepNm2, FeepR2};
 Sat2.PowerSystem      = FeepPower;
 
 %----------------------------------------
@@ -195,7 +221,7 @@ FeepT1.ThrustDirection3   = 0;
 FeepT1.DutyCycle          = 0;
 FeepT1.DecrementMass      = true;
 FeepT1.Tank               = {Tank1};
-FeepT1.GravitationalAccel = 9.81;
+FeepT1.GravitationalAccel = 9.80665;
 FeepT1.ThrustModel        = ConstantThrustAndIsp;
 FeepT1.MaximumUsablePower = 0.5;
 FeepT1.MinimumUsablePower = 0.001;
@@ -215,7 +241,7 @@ FeepNp1.SecondDirectionZ    = 0;
 FeepNp1.DutyCycle          = 0;
 FeepNp1.DecrementMass      = true;
 FeepNp1.Tank               = {Tank1};
-FeepNp1.GravitationalAccel = 9.81;
+FeepNp1.GravitationalAccel = 9.80665;
 FeepNp1.ThrustModel        = ConstantThrustAndIsp;
 FeepNp1.MaximumUsablePower = 0.5;
 FeepNp1.MinimumUsablePower = 0.001;
@@ -235,7 +261,7 @@ FeepNm1.SecondDirectionZ    = 0;
 FeepNm1.DutyCycle          = 0;
 FeepNm1.DecrementMass      = true;
 FeepNm1.Tank               = {Tank1};
-FeepNm1.GravitationalAccel = 9.81;
+FeepNm1.GravitationalAccel = 9.80665;
 FeepNm1.ThrustModel        = ConstantThrustAndIsp;
 FeepNm1.MaximumUsablePower = 0.5;
 FeepNm1.MinimumUsablePower = 0.001;
@@ -253,7 +279,7 @@ FeepT2.ThrustDirection3   = 0;
 FeepT2.DutyCycle          = 0;
 FeepT2.DecrementMass      = true;
 FeepT2.Tank               = {Tank2};
-FeepT2.GravitationalAccel = 9.81;
+FeepT2.GravitationalAccel = 9.80665;
 FeepT2.ThrustModel        = ConstantThrustAndIsp;
 FeepT2.MaximumUsablePower = 0.5;
 FeepT2.MinimumUsablePower = 0.001;
@@ -273,7 +299,7 @@ FeepNp2.SecondDirectionZ    = 0;
 FeepNp2.DutyCycle          = 0;
 FeepNp2.DecrementMass      = true;
 FeepNp2.Tank               = {Tank2};
-FeepNp2.GravitationalAccel = 9.81;
+FeepNp2.GravitationalAccel = 9.80665;
 FeepNp2.ThrustModel        = ConstantThrustAndIsp;
 FeepNp2.MaximumUsablePower = 0.5;
 FeepNp2.MinimumUsablePower = 0.001;
@@ -293,31 +319,71 @@ FeepNm2.SecondDirectionZ    = 0;
 FeepNm2.DutyCycle          = 0;
 FeepNm2.DecrementMass      = true;
 FeepNm2.Tank               = {Tank2};
-FeepNm2.GravitationalAccel = 9.81;
+FeepNm2.GravitationalAccel = 9.80665;
 FeepNm2.ThrustModel        = ConstantThrustAndIsp;
 FeepNm2.MaximumUsablePower = 0.5;
 FeepNm2.MinimumUsablePower = 0.001;
 FeepNm2.ConstantThrust     = 0.004;
 FeepNm2.Isp                = 3000;
 
+
+% Retrograde thrusters, used ONLY for the end-of-life clearance and disposal
+% (the operational control above is prograde + out-of-plane).
+Create ElectricThruster FeepR1;
+FeepR1.CoordinateSystem   = Local;
+FeepR1.Origin             = Earth;
+FeepR1.Axes               = VNB;
+FeepR1.ThrustDirection1   = -1;
+FeepR1.ThrustDirection2   = 0;
+FeepR1.ThrustDirection3   = 0;
+FeepR1.DutyCycle          = 0;
+FeepR1.DecrementMass      = true;
+FeepR1.Tank               = {Tank1};
+FeepR1.GravitationalAccel = 9.80665;
+FeepR1.ThrustModel        = ConstantThrustAndIsp;
+FeepR1.MaximumUsablePower = 0.5;
+FeepR1.MinimumUsablePower = 0.001;
+FeepR1.ConstantThrust     = 0.004;
+FeepR1.Isp                = 3000;
+Create ElectricThruster FeepR2;
+FeepR2.CoordinateSystem   = Local;
+FeepR2.Origin             = Earth;
+FeepR2.Axes               = VNB;
+FeepR2.ThrustDirection1   = -1;
+FeepR2.ThrustDirection2   = 0;
+FeepR2.ThrustDirection3   = 0;
+FeepR2.DutyCycle          = 0;
+FeepR2.DecrementMass      = true;
+FeepR2.Tank               = {Tank2};
+FeepR2.GravitationalAccel = 9.80665;
+FeepR2.ThrustModel        = ConstantThrustAndIsp;
+FeepR2.MaximumUsablePower = 0.5;
+FeepR2.MinimumUsablePower = 0.001;
+FeepR2.ConstantThrust     = 0.004;
+FeepR2.Isp                = 3000;
+
 %----------------------------------------
 %---------- Burns
 %----------------------------------------
 
 Create FiniteBurn Burn1;
-Burn1.Thrusters = {FeepT1, FeepNp1, FeepNm1};
+Burn1.Thrusters = {FeepT1, FeepNp1, FeepNm1, FeepR1};
 
 Create FiniteBurn Burn2;
-Burn2.Thrusters = {FeepT2, FeepNp2, FeepNm2};
+Burn2.Thrusters = {FeepT2, FeepNp2, FeepNm2, FeepR2};
 
 %----------------------------------------
 %---------- ForceModels
 %----------------------------------------
 
 % 8x8 EGM96, Sun and Moon point masses, SRP, NRLMSISE-00 drag driven by the
-% Schatten solar-cycle prediction (nominal cycle, nominal error model).
-% Change SchattenErrorModel to 'PlusTwoSigma' / 'MinusTwoSigma' and SchattenTimingModel
-% to 'EarlyCycle' / 'LateCycle' for high/low solar-activity scenarios.
+% Schatten (MSFC) solar-cycle prediction. AD10 (EOP-FM/2024-07-177, 5.9) asks for
+% the 95th percentile of F10.7 and Ap for the beginning of life and the nominal
+% operations (here the Schatten +2 sigma prediction, 'PlusTwoSigma') and for the
+% 50th percentile for the end-of-life operations ('Nominal', see EolFM below).
+% Use 'Nominal' for the 50th percentile or 'MinusTwoSigma', and SchattenTimingModel
+% 'EarlyCycle' / 'LateCycle', for other solar-activity scenarios. Replace
+% SchattenPredict.txt by the project's MSFC prediction file when there is one.
 Create ForceModel FormationFM;
 FormationFM.CentralBody                      = Earth;
 FormationFM.PrimaryBodies                    = {Earth};
@@ -336,11 +402,37 @@ FormationFM.Drag.AtmosphereModel             = NRLMSISE00;
 FormationFM.Drag.HistoricWeatherSource       = 'ConstantFluxAndGeoMag';
 FormationFM.Drag.PredictedWeatherSource      = 'SchattenFile';
 FormationFM.Drag.SchattenFile                = 'SchattenPredict.txt';
-FormationFM.Drag.SchattenErrorModel          = 'Nominal';
+FormationFM.Drag.SchattenErrorModel          = 'PlusTwoSigma';
 FormationFM.Drag.SchattenTimingModel         = 'NominalCycle';
 FormationFM.Drag.F107                        = 150;
 FormationFM.Drag.F107A                       = 150;
 FormationFM.Drag.MagneticIndex               = 3;
+
+% End-of-life force model: 50th percentile solar activity (AD10 5.9, ESSB-ST-U-007
+% 6.2.g), 4x4 gravity (the lifetime is driven by drag, not by the tesseral terms).
+Create ForceModel EolFM;
+EolFM.CentralBody                      = Earth;
+EolFM.PrimaryBodies                    = {Earth};
+EolFM.PointMasses                      = {Sun, Luna};
+EolFM.SRP                              = On;
+EolFM.RelativisticCorrection           = Off;
+EolFM.ErrorControl                     = RSSStep;
+EolFM.GravityField.Earth.Degree        = 4;
+EolFM.GravityField.Earth.Order         = 4;
+EolFM.GravityField.Earth.PotentialFile = 'EGM96.cof';
+EolFM.GravityField.Earth.TideModel     = 'None';
+EolFM.SRP.Flux                         = 1367;
+EolFM.SRP.SRPModel                     = Spherical;
+EolFM.SRP.Nominal_Sun                  = 149597870.691;
+EolFM.Drag.AtmosphereModel             = NRLMSISE00;
+EolFM.Drag.HistoricWeatherSource       = 'ConstantFluxAndGeoMag';
+EolFM.Drag.PredictedWeatherSource      = 'SchattenFile';
+EolFM.Drag.SchattenFile                = 'SchattenPredict.txt';
+EolFM.Drag.SchattenErrorModel          = 'Nominal';
+EolFM.Drag.SchattenTimingModel         = 'NominalCycle';
+EolFM.Drag.F107                        = 150;
+EolFM.Drag.F107A                       = 150;
+EolFM.Drag.MagneticIndex               = 3;
 
 %----------------------------------------
 %---------- Propagators
@@ -355,6 +447,16 @@ FormationProp.MinStep                  = 0.001;
 FormationProp.MaxStep                  = 300;
 FormationProp.MaxStepAttempts          = 50;
 FormationProp.StopIfAccuracyIsViolated = true;
+
+Create Propagator EolProp;
+EolProp.FM                       = EolFM;
+EolProp.Type                     = PrinceDormand78;
+EolProp.InitialStepSize          = 60;
+EolProp.Accuracy                 = 1e-9;
+EolProp.MinStep                  = 0.001;
+EolProp.MaxStep                  = 600;
+EolProp.MaxStepAttempts          = 50;
+EolProp.StopIfAccuracyIsViolated = false;
 
 %----------------------------------------
 %---------- Coordinate Systems
@@ -420,6 +522,11 @@ Create Variable TMin TMax ANMin ANMax RngMin dAMax1 dAMax2 nOutT nOutN nRel dEp 
 
 % Acquisition (both satellites start at the same place)
 Create Variable AcqOn VAcq TLeadAcq diAcq acq acqT acqN zeroA tAcq dvAcq1 dvAcq2 dvAcqTot;
+Create Variable LaunchDelayDays A1Mod0 raanTmp EolOn dAClear HDisp CdEol LifeMaxDays HReentry;
+Create Variable aEol1 aEol2 aClearT1 aClearT2 aDispT aNow1 aNow2 iEol nNowE dAday dRemE dutyE dvStep t0Eol;
+Create Variable dvClr1 dvClr2 dvDisp1 dvDisp2 life1 life2 hEnd1 hEnd2 mEolA1 mEolA2 mEolB1 mEolB2;
+Create Variable aPrev aLoC fracC mPropEol1 mPropEol2 dvRktEol1 dvRktEol2;
+Create Variable dvAcqT1 dvAcqN1 dvAcqT2 dvAcqN2 dvNo1 dvNo2 dvNf1 dvNf2 dvN1pre dvN2pre dNinc1 dNinc2;
 Create Variable kOm vCircA diMaxA diNow absDiNow diEnd tRampD dFut dPred TStopUp useAbs;
 
 %----------------------------------------
@@ -482,7 +589,7 @@ kappaT  = 0.3;           % fraction of the needed SMA change commanded per cycle
 % FEEP assumptions (ThrustN must equal ConstantThrust above, Isp0 the Isp)
 ThrustN = 0.004;         % N per thruster (a cluster of four 1 mN FEEP heads)
 Isp0    = 3000;          % s
-g0      = 9.81;          % m/s^2, same value as the thrusters' GravitationalAccel
+g0      = 9.80665;       % m/s^2, standard gravity (AD10), same as the thrusters' GravitationalAccel
 
 % Controller tuning
 tauA    = 129600;        % s, altitude loop time constant (1.5 day)
@@ -504,6 +611,24 @@ VAcq     = 10;           % km/day, along-track drift rate during the acquisition
 TLeadAcq = 25;           % km, stop the drift this far before TCenter (it decays with drag)
 diAcq    = 0.1;          % deg, Sat2 inclination offset that drives the RAAN offset apart
 
+% Launch date (AD10 5.5: also assess launch delays of up to 5 years). The epoch
+% is moved by LaunchDelayDays and the node follows the mean Sun, so the LTAN
+% is kept; the solar activity (Schatten file) of the new dates is used.
+LaunchDelayDays = 0;     % days after 01 Jan 2027
+
+% End-of-life operations (AD10 6.3, ESSB-ST-U-007 5.4.2.3). After the mission both
+% satellites are lowered with their retrograde thrusters (continuous full thrust):
+% first the clearance of the operational orbit (SMA drop of at least 5 km), then
+% the disposal to an orbit whose natural decay is shorter than 5 years. The
+% lifetime is then verified by propagating with Cd 2.2 and the 50th percentile of
+% the solar activity (EolFM) until re-entry (HReentry) or LifeMaxDays.
+EolOn       = 1;         % 0 = stop at the end of the mission
+dAClear     = 5;         % km, AD10: minimum SMA drop to clear the operational orbit
+HDisp       = 460;       % km, mean altitude of the disposal orbit (natural decay 4.4 years at worst, see the lifetime sweep)
+CdEol       = 2.2;       % AD10: Cd for the end-of-life operations
+LifeMaxDays = 1826;      % days, 5 years (ESSB-ST-U-007 5.4.2.3)
+HReentry    = 120;       % km, altitude taken as re-entry
+
 % Constants (EGM96)
 muE = 398600.4415;
 ReE = 6378.1363;
@@ -514,6 +639,12 @@ PiC = 3.14159265358979;
 %  Initial formation geometry
 %---------------------------------------------------------------
 MissionSecs = MissionDays * 86400;
+% Launch date: move the epoch of both satellites and the node with the mean Sun
+A1Mod0 = Sat1.A1ModJulian;
+Sat1.A1ModJulian = A1Mod0 + LaunchDelayDays;
+Sat2.A1ModJulian = A1Mod0 + LaunchDelayDays;
+raanTmp = raanRef + 0.9856474 * LaunchDelayDays;
+raanRef = mod(raanTmp, 360);
 iRad     = degToRad(iRef);
 sI       = sin(iRad);
 cI       = cos(iRad);
@@ -563,6 +694,14 @@ If acq == 1
 EndIf;
 acqT = acq;
 acqN = acq;
+dvAcqT1 = 0;
+dvAcqN1 = 0;
+dvAcqT2 = 0;
+dvAcqN2 = 0;
+dvNo1 = 0;
+dvNo2 = 0;
+dvNf1 = 0;
+dvNf2 = 0;
 zeroA = 0;
 tAcq = 0;
 dvAcq1 = 0;
@@ -678,6 +817,10 @@ While finished == 0
                dvAcq1 = dvT1 + dvN1;
                dvAcq2 = dvT2 + dvN2;
                dvAcqTot = dvAcq1 + dvAcq2;
+               dvAcqT1 = dvT1;
+               dvAcqN1 = dvN1;
+               dvAcqT2 = dvT2;
+               dvAcqN2 = dvN2;
               EndIf;
             EndIf;
          EndIf;
@@ -1062,6 +1205,8 @@ While finished == 0
 
    If finished == 0
 
+      dvN1pre = dvN1;
+      dvN2pre = dvN2;
       dutySumT1 = dutySumT1 + dutyT1;
       dutySumT2 = dutySumT2 + dutyT2;
       If dutyT1 > dutyMaxT1
@@ -1216,6 +1361,21 @@ While finished == 0
       aAvg2 = sumA2 / nOrbCycle;
       iAvg2 = sumI2 / nOrbCycle;
 
+      % After the acquisition the normal delta-V is split into the sun-synchronous
+      % inclination hold (out-of-plane orbit control) and the formation (Sat2
+      % relative to Sat1, node trim).
+      dNinc1 = dvN1 - dvN1pre;
+      dNinc2 = dvN2 - dvN2pre;
+      If acq == 0
+         If useAbs == 1
+            dvNo1 = dvNo1 + dNinc1;
+            dvNo2 = dvNo2 + dNinc2;
+         Else
+            dvNf1 = dvNf1 + dNinc1;
+            dvNf2 = dvNf2 + dNinc2;
+         EndIf;
+      EndIf;
+
       tSim    = tSim + CycleSecs;
       orbDone = orbDone + nOrbCycle;
       nCyc    = nCyc + 1;
@@ -1223,7 +1383,7 @@ While finished == 0
 EndWhile;
 
 %---------------------------------------------------------------
-%  Summary
+%  Summary of the mission (beginning of life + nominal operations)
 %---------------------------------------------------------------
 mProp1    = m01 - Sat1.TotalMass;
 mProp2    = m02 - Sat2.TotalMass;
@@ -1233,7 +1393,123 @@ dvTot     = dvT1 + dvN1 + dvT2 + dvN2;
 dutySumT1 = dutySumT1 / nCyc;
 dutySumT2 = dutySumT2 / nCyc;
 
+%---------------------------------------------------------------
+%  End of life: clearance of the operational orbit and disposal
+%---------------------------------------------------------------
+% Cd 2.2 (AD10 5.2) and the 50th percentile solar activity (EolFM). Each
+% satellite is lowered with its retrograde thruster at full thrust, one day at a
+% time; the first dAClear km are the clearance, the rest is the disposal. The
+% thrust is cut when the mean SMA reaches the disposal orbit, and the natural
+% decay from there is propagated until re-entry or LifeMaxDays.
+dvClr1  = 0;
+dvClr2  = 0;
+dvDisp1 = 0;
+dvDisp2 = 0;
+life1   = 0;
+life2   = 0;
+hEnd1   = 0;
+hEnd2   = 0;
+mEolA1  = Sat1.TotalMass;
+mEolA2  = Sat2.TotalMass;
+mEolB1  = mEolA1;
+mEolB2  = mEolA2;
+aDispT  = ReE + HDisp;
+If EolOn == 1
+   If ControlOn == 1
+      Sat1.Cd = CdEol;
+      Sat2.Cd = CdEol;
+
+      aEol1    = Sat1.EarthTOD.BrouwerShortSMA;
+      aClearT1 = aEol1 - dAClear;
+      aNow1    = aEol1;
+      iEol     = 0;
+      While aNow1 > aDispT & iEol < 600
+         nNowE  = sqrt(muE / (aNow1*aNow1*aNow1));
+         fMax1  = ThrustN / Sat1.TotalMass;
+         dAday  = 2 * fMax1 * 86400 / nNowE / 1000;
+         dRemE  = aNow1 - aDispT;
+         dutyE  = dRemE / dAday;
+         If dutyE > 1
+            dutyE = 1;
+         EndIf;
+         Sat1.FeepR1.DutyCycle = dutyE;
+         BeginFiniteBurn Burn1(Sat1);
+         Propagate EolProp(Sat1) {Sat1.ElapsedSecs = 86400};
+         EndFiniteBurn Burn1(Sat1);
+         dvStep = dutyE * fMax1 * 86400;
+         % share of this day's thrust spent above the clearance level
+         aPrev  = aNow1;
+         aNow1 = Sat1.EarthTOD.BrouwerShortSMA;
+         fracC  = 0;
+         If aPrev > aClearT1
+            aLoC = aNow1;
+            If aLoC < aClearT1
+               aLoC = aClearT1;
+            EndIf;
+            fracC = (aPrev - aLoC) / (aPrev - aNow1);
+         EndIf;
+         dvClr1  = dvClr1 + fracC * dvStep;
+         dvDisp1 = dvDisp1 + (1 - fracC) * dvStep;
+         iEol  = iEol + 1;
+      EndWhile;
+      Sat1.FeepR1.DutyCycle = 0;
+      mEolB1 = Sat1.TotalMass;
+
+      aEol2    = Sat2.EarthTOD.BrouwerShortSMA;
+      aClearT2 = aEol2 - dAClear;
+      aNow2    = aEol2;
+      iEol     = 0;
+      While aNow2 > aDispT & iEol < 600
+         nNowE  = sqrt(muE / (aNow2*aNow2*aNow2));
+         fMax2  = ThrustN / Sat2.TotalMass;
+         dAday  = 2 * fMax2 * 86400 / nNowE / 1000;
+         dRemE  = aNow2 - aDispT;
+         dutyE  = dRemE / dAday;
+         If dutyE > 1
+            dutyE = 1;
+         EndIf;
+         Sat2.FeepR2.DutyCycle = dutyE;
+         BeginFiniteBurn Burn2(Sat2);
+         Propagate EolProp(Sat2) {Sat2.ElapsedSecs = 86400};
+         EndFiniteBurn Burn2(Sat2);
+         dvStep = dutyE * fMax2 * 86400;
+         % share of this day's thrust spent above the clearance level
+         aPrev  = aNow2;
+         aNow2 = Sat2.EarthTOD.BrouwerShortSMA;
+         fracC  = 0;
+         If aPrev > aClearT2
+            aLoC = aNow2;
+            If aLoC < aClearT2
+               aLoC = aClearT2;
+            EndIf;
+            fracC = (aPrev - aLoC) / (aPrev - aNow2);
+         EndIf;
+         dvClr2  = dvClr2 + fracC * dvStep;
+         dvDisp2 = dvDisp2 + (1 - fracC) * dvStep;
+         iEol  = iEol + 1;
+      EndWhile;
+      Sat2.FeepR2.DutyCycle = 0;
+      mEolB2 = Sat2.TotalMass;
+
+      % Natural decay of the disposal orbit (thrusters off)
+      t0Eol = Sat1.A1ModJulian;
+      Propagate EolProp(Sat1) {Sat1.ElapsedDays = LifeMaxDays, Sat1.Earth.Altitude = HReentry};
+      life1 = Sat1.A1ModJulian - t0Eol;
+      hEnd1 = Sat1.Earth.Altitude;
+      t0Eol = Sat2.A1ModJulian;
+      Propagate EolProp(Sat2) {Sat2.ElapsedDays = LifeMaxDays, Sat2.Earth.Altitude = HReentry};
+      life2 = Sat2.A1ModJulian - t0Eol;
+      hEnd2 = Sat2.Earth.Altitude;
+   EndIf;
+EndIf;
+mPropEol1 = mEolA1 - mEolB1;
+mPropEol2 = mEolA2 - mEolB2;
+dvRktEol1 = Isp0 * g0 * log(mEolA1 / mEolB1);
+dvRktEol2 = Isp0 * g0 * log(mEolA2 / mEolB2);
+
 Report SummaryReport MissionDays tDays nCyc dvT1 dvN1 dvT2 dvN2 dvTot dvRkt1 dvRkt2 mProp1 mProp2;
 Report SummaryReport dutySumT1 dutyMaxT1 dutySumT2 dutyMaxT2 campCyc1 campCyc2 dAMax1 dAMax2 nRel nOmEv;
 Report SummaryReport TMin TMax ANMin ANMax RngMin nOutT nOutN epMax;
-Report SummaryReport tAcq dvAcq1 dvAcq2 dvAcqTot;
+Report SummaryReport tAcq dvAcqT1 dvAcqN1 dvAcqT2 dvAcqN2 dvNo1 dvNo2 dvNf1 dvNf2;
+Report SummaryReport dvClr1 dvClr2 dvDisp1 dvDisp2 aDispT life1 life2 hEnd1 hEnd2;
+Report SummaryReport mPropEol1 mPropEol2 dvRktEol1 dvRktEol2;
