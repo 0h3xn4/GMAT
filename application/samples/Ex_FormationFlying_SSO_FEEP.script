@@ -58,17 +58,20 @@
 %                   that gives exactly the sun-synchronous nodal rate. When the
 %                   error exceeds iDead, both do an out-of-plane campaign with
 %                   sign(cos(u)) thrust (flipped at the polar points).
-%                   HoldSSO = 0: no absolute control; Sat2 only follows the
-%                   inclination of Sat1 (campaigns when it differs by more
-%                   than iDeadRel), so the two planes keep precessing together.
+%                   HoldSSO = 0: no absolute control; the inclination of Sat2
+%                   relative to Sat1 is kept (campaigns when it is off by more
+%                   than iDeadRel), each satellite doing half of the change so
+%                   that both use about the same propellant, and the two planes
+%                   keep precessing together.
 %                   In both cases the RAAN offset is trimmed with a small
 %                   differential inclination if the N amplitude has drifted.
 %     0. Acquisition (AcqOn = 1, first months): Sat1 is raised by a small SMA
 %                   offset so that Sat2 drifts ahead at VAcq km/day (the same
 %                   relative-drift law as 2.); the drift is stopped TLeadAcq km
 %                   before TCenter and left to decay with drag. At the same time
-%                   Sat2 is held diAcq above Sat1 in inclination, which makes its
-%                   node run ahead (d(RAAN rate)/di = 0.128 deg/day per deg). The
+%                   Sat2 is held diAcq above Sat1 in inclination (Sat1 goes down and
+%                   Sat2 up by half of it each, so both burn the same), which makes
+%                   the node of Sat2 run ahead (d(RAAN rate)/di = 0.128 deg/day per deg). The
 %                   offset is removed when the RAAN offset predicted for the end
 %                   of that ramp reaches dRaan; the slow trim of 3. finishes the
 %                   job. Normal separation costs delta-V x time = const: a larger
@@ -539,7 +542,7 @@ Create Variable aEol1 aEol2 aClearT1 aClearT2 aDispT aNow1 aNow2 iEol nNowE dAda
 Create Variable dvClr1 dvClr2 dvDisp1 dvDisp2 life1 life2 hEnd1 hEnd2 mEolA1 mEolA2 mEolB1 mEolB2;
 Create Variable massPre massPost aPrev aLoC fracC mPropEol1 mPropEol2 dvRktEol1 dvRktEol2;
 Create Variable dvAcqT1 dvAcqN1 dvAcqT2 dvAcqN2 dvNo1 dvNo2 dvNf1 dvNf2 dvN1pre dvN2pre dNinc1 dNinc2;
-Create Variable kOm vCircA diMaxA diNow absDiNow diEnd tRampD dFut dPred TStopUp useAbs;
+Create Variable relRem kOm vCircA diMaxA diNow absDiNow diEnd tRampD dFut dPred TStopUp useAbs;
 
 %----------------------------------------
 %---------- Subscribers
@@ -621,7 +624,8 @@ AcqOn    = 1;            % 1 = both satellites start at the same position and th
                          %     is built first by a phasing manoeuvre; 0 = start in formation
 VAcq     = 10;           % km/day, along-track drift rate during the acquisition
 TLeadAcq = 25;           % km, stop the drift this far before TCenter (it decays with drag)
-diAcq    = 0.1;          % deg, Sat2 inclination offset that drives the RAAN offset apart
+diAcq    = 0.1;          % deg, inclination offset of Sat2 over Sat1 that drives the RAAN
+                         %      offset apart (Sat1 goes down and Sat2 up by half of it)
 
 % Launch date (AD10 5.5: also assess launch delays of up to 5 years). The epoch
 % is moved by LaunchDelayDays and the node follows the mean Sun, so the LTAN
@@ -822,6 +826,7 @@ While finished == 0
    If acq == 1
       If acqT == 0
          If acqN == 0
+            If camp1 == 0
             If camp2 == 0
               If absDiNow < diEnd
                acq = 0;
@@ -834,6 +839,7 @@ While finished == 0
                dvAcqT2 = dvT2;
                dvAcqN2 = dvN2;
               EndIf;
+            EndIf;
             EndIf;
          EndIf;
       EndIf;
@@ -1056,14 +1062,15 @@ While finished == 0
    eOmRel = 0.25 * eOmTol;
    absEo = abs(eOm);
    If acqN == 1
-      % Node acquisition: Sat2 is held diAcq above Sat1 so that its node runs ahead.
+      % Node acquisition: Sat2 is held diAcq above Sat1 (each satellite moves half of
+      % it) so that the node of Sat2 runs ahead.
       % The offset is removed again (taking diNow/diMax cycles, during which the node
       % keeps drifting) as soon as the offset predicted for the end of that ramp
       % reaches the target. The slow trim below removes what is left.
       vCircA = sqrt(muE / aAvg2) * 1000;
       diMaxA = radToDeg((2 / PiC) * (fMax2 / vCircA) * CycleSecs);
       diNow  = iAvg2 - iAvg1;
-      tRampD = (diNow / diMaxA) * (CycleSecs / 86400);
+      tRampD = (diNow / (2 * diMaxA)) * (CycleSecs / 86400);
       dFut   = kOm * diNow * (0.5 * tRampD + 0.5);
       dPred  = eOm + dFut;
       diCmd  = diAcq;
@@ -1102,8 +1109,10 @@ While finished == 0
    absDi1 = abs(diErr1);
    absDi2 = abs(diErr2);
 
-   % With HoldSSO = 0 the satellites follow Sat1's inclination: only Sat2 runs
-   % campaigns, relative to Sat1, and Sat1 never does.
+   % With HoldSSO = 0 (and during the acquisition) only the inclination of Sat2
+   % relative to Sat1 is controlled, and the two satellites share it: each one
+   % moves half of the change, in opposite directions, so they use about the
+   % same propellant and the common plane is left alone.
    % A campaign is planned open loop: when a limit is reached, the change needed
    % to get to the aim point is commanded over as many cycles as it takes, and
    % the commanded change (not the lagging measurement) is counted down.
@@ -1149,8 +1158,11 @@ While finished == 0
          diRem1 = -diErr1 + aimSign * iAim;
          diRem2 = -diErr2 + aimSign * iAim;
       Else
+         relRem = -diErr2 + aimSign * iAimRel;
+         camp1  = 1;
          camp2  = 1;
-         diRem2 = -diErr2 + aimSign * iAimRel;
+         diRem1 = -0.5 * relRem;
+         diRem2 = 0.5 * relRem;
       EndIf;
    EndIf;
 
