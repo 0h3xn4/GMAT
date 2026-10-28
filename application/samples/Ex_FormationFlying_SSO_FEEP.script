@@ -83,9 +83,10 @@
 %   with HoldSSO = 0, 500..660 g with HoldSSO = 1 (5 kg tanks).
 %   With HoldSSO = 0 the inclination falls from 97.65 to 97.47 deg (Sun and Moon)
 %   and the LTAN drifts from 10:30 to about 09:10 over the 5 years; with
-%   HoldSSO = 1 it stays within 0.8 min. Without any control the same pair drifts
-%   out of the corridor within a year, the closest approach is 25 km and the
-%   LTAN slips by about an hour.
+%   HoldSSO = 1 it stays within 0.8 min. Without any control the same pair loses
+%   5.5 km of altitude in year 1, leaves the along-track corridor after 168
+%   days and the N-amplitude band after 708 days, and the LTAN slips by about
+%   40 min.
 %
 %  Run time is about 30 min for 5 years in GmatConsole (about 1 s per day).
 %  Plots and a budget table from the output files: plot_formation_results.py
