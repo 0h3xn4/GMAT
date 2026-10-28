@@ -69,21 +69,21 @@
 %        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
 %        epMax               : largest epoch difference between the satellites, s
 %
-%  REFERENCE RESULTS (GMAT R2026a, 560 km, 400 kg, 4 mN, 5 years, delta-V in m/s)
+%  REFERENCE RESULTS (GMAT R2026a, 560 km, 400 kg, 4 mN, Cd 3.0, 4.5 m^2, 5 years, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
 %   HoldSSO = 0 (default: the orbit plane is allowed to drift)
-%     Schatten nominal              2.3        0.0        2.5        3.4        8.1
-%     +2 sigma, late cycle          5.6        0.0        6.2        3.4       15.1
+%     Schatten nominal              7.0        0.0        7.0        3.3       17.3
+%     +2 sigma, late cycle         17.2        0.0       17.3        3.3       37.9
 %   HoldSSO = 1 (sun-synchronous inclination and LTAN held)
-%     Schatten nominal              2.3       31.6        2.5       29.8       66.1
-%     +2 sigma, late cycle          5.6       31.5        6.2       29.7       73.0
+%     Schatten nominal              7.0       31.5        7.1       29.8       75.4
+%     +2 sigma, late cycle         17.4       31.5       17.4       29.9       96.2
 %   tang = altitude + along-track, norm = inclination / node control.
-%   Along-track stays within 283..535 km (limit 50..1000 km) and the N amplitude
-%   within 198..206 km in all four cases. Propellant: 31..130 g per satellite
-%   with HoldSSO = 0, 440..500 g with HoldSSO = 1 (5 kg tanks).
+%   Along-track stays within 282..529 km (limit 50..1000 km) and the N amplitude
+%   within 198..206 km in all four cases. Propellant: 95..280 g per satellite
+%   with HoldSSO = 0, 500..660 g with HoldSSO = 1 (5 kg tanks).
 %   With HoldSSO = 0 the inclination falls from 97.65 to 97.47 deg (Sun and Moon)
 %   and the LTAN drifts from 10:30 to about 09:10 over the 5 years; with
-%   HoldSSO = 1 it stays within 0.7 min. Without any control the same pair drifts
+%   HoldSSO = 1 it stays within 0.8 min. Without any control the same pair drifts
 %   out of the corridor within a year, the closest approach is 25 km and the
 %   LTAN slips by about an hour.
 %
