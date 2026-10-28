@@ -28,8 +28,9 @@
 %     never limits thrust
 %     Gravity 8x8, Sun + Moon, SRP, NRLMSISE-00 drag with the Schatten
 %     nominal solar-cycle prediction
-%     The satellites start in their formation slots (launcher / acquisition
-%     manoeuvres are not in the budget)
+%     AcqOn = 1 (default): both satellites are released at exactly the same
+%     position and the formation is built by a phasing manoeuvre (below); its
+%     delta-V is part of the budget. AcqOn = 0: they start in their slots.
 %
 %  CONTROL (one cycle = 15 orbits, about 1.000 day)
 %     1. Altitude : each satellite tracks a target mean SMA with a PI law on
@@ -50,6 +51,17 @@
 %                   than iDeadRel), so the two planes keep precessing together.
 %                   In both cases the RAAN offset is trimmed with a small
 %                   differential inclination if the N amplitude has drifted.
+%     0. Acquisition (AcqOn = 1, first months): Sat1 is raised by a small SMA
+%                   offset so that Sat2 drifts ahead at VAcq km/day (the same
+%                   relative-drift law as 2.); the drift is stopped TLeadAcq km
+%                   before TCenter and left to decay with drag. At the same time
+%                   Sat2 is held diAcq above Sat1 in inclination, which makes its
+%                   node run ahead (d(RAAN rate)/di = 0.128 deg/day per deg). The
+%                   offset is removed when the RAAN offset predicted for the end
+%                   of that ramp reaches dRaan; the slow trim of 3. finishes the
+%                   job. Normal separation costs delta-V x time = const: a larger
+%                   diAcq is faster and costs proportionally more. Results are
+%                   judged (TMin/TMax, nOutT, ...) after the acquisition ends.
 %     The controller uses Brouwer-Lyddane mean elements referred to the
 %     true-of-date equator, averaged over the 15 orbits of the cycle.
 %
@@ -68,6 +80,9 @@
 %        ANMin/ANMax         : normal-separation amplitude extremes, km
 %        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
 %        epMax               : largest epoch difference between the satellites, s
+%        tAcq                : day the acquisition ended (0 if AcqOn = 0)
+%        dvAcq1/dvAcq2/dvAcqTot : delta-V used up to then (included in dvT/dvN)
+%     The Daily file has a last column acq (1 while the acquisition runs).
 %
 %  REFERENCE RESULTS (GMAT R2026a, 560 km, 400 kg, 4 mN, Cd 3.0, 4.5 m^2, 5 years, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
@@ -403,6 +418,10 @@ Create Variable dutySumT1 dutySumT2 dutyMaxT1 dutyMaxT2 campCyc1 campCyc2;
 % Compliance statistics
 Create Variable TMin TMax ANMin ANMax RngMin dAMax1 dAMax2 nOutT nOutN nRel dEp absEp epMax;
 
+% Acquisition (both satellites start at the same place)
+Create Variable AcqOn VAcq TLeadAcq diAcq acq acqT acqN zeroA tAcq dvAcq1 dvAcq2 dvAcqTot;
+Create Variable kOm vCircA diMaxA diNow absDiNow diEnd tRampD dFut dPred TStopUp useAbs;
+
 %----------------------------------------
 %---------- Subscribers
 %----------------------------------------
@@ -478,6 +497,13 @@ iAimRel = 0.0005;        % deg, ... and aims this far past Sat1's inclination
 eOmTol  = 0.04;          % deg, tolerated drift of the RAAN offset (about 5 km of N amplitude)
 diBias  = 0.004;         % deg, differential inclination used to steer the RAAN offset back
 
+% Acquisition of the formation (only with ControlOn = 1)
+AcqOn    = 1;            % 1 = both satellites start at the same position and the formation
+                         %     is built first by a phasing manoeuvre; 0 = start in formation
+VAcq     = 10;           % km/day, along-track drift rate during the acquisition
+TLeadAcq = 25;           % km, stop the drift this far before TCenter (it decays with drag)
+diAcq    = 0.1;          % deg, Sat2 inclination offset that drives the RAAN offset apart
+
 % Constants (EGM96)
 muE = 398600.4415;
 ReE = 6378.1363;
@@ -494,6 +520,12 @@ cI       = cos(iRad);
 dRaanRad = NAmp / (aRef * sI);
 dRaan    = radToDeg(dRaanRad);
 du0      = radToDeg(T0 / aRef) - dRaan * cI;
+acq      = 0;
+If AcqOn == 1
+   If ControlOn == 1
+      acq = 1;
+   EndIf;
+EndIf;
 
 Sat1.BrouwerShortSMA  = aRef;
 Sat1.BrouwerShortECC  = eRef;
@@ -508,6 +540,11 @@ Sat2.BrouwerShortINC  = iRef;
 Sat2.BrouwerShortRAAN = raanRef + 0.5 * dRaan;
 Sat2.BrouwerShortAOP  = aopRef;
 Sat2.BrouwerShortMA   = du0;
+% Acquisition start: Sat2 is released at exactly the position of Sat1
+If acq == 1
+   Sat2.BrouwerShortRAAN = raanRef - 0.5 * dRaan;
+   Sat2.BrouwerShortMA   = 0;
+EndIf;
 
 %---------------------------------------------------------------
 %  Initialise controller state and statistics
@@ -521,6 +558,16 @@ diCmd = 0;
 nOmEv = 0;
 relMode = 0;
 Tprev = T0;
+If acq == 1
+   Tprev = 0;
+EndIf;
+acqT = acq;
+acqN = acq;
+zeroA = 0;
+tAcq = 0;
+dvAcq1 = 0;
+dvAcq2 = 0;
+dvAcqTot = 0;
 CyclePrev = 86400;
 ff1 = ffInit;
 ff2 = ffInit;
@@ -571,6 +618,8 @@ nM1     = sqrt(muE / (aRef*aRef*aRef));
 s2M1    = sI * sI;
 uDotNom = nM1 * (1 + J2E * (ReE/aRef) * (ReE/aRef) * (4.5 - 6 * s2M1));
 TnNom   = 2 * PiC / uDotNom;
+% d(RAAN rate)/d(inclination) in deg/day per deg, used to plan the acquisition
+kOm     = 1.5 * J2E * (ReE/aRef) * (ReE/aRef) * nM1 * sI * 86400;
 MissionOrbits = fix(MissionSecs / TnNom);
 
 While finished == 0
@@ -615,7 +664,28 @@ While finished == 0
    sM1    = sin(degToRad(iAvg1));
    ANamp  = aAvg1 * sqrt(diM*diM + sM1*sM1*dRaanM*dRaanM);
 
-   % Statistics
+   % End of the acquisition: drift stopped, node offset reached, inclination offset removed
+   diNow    = iAvg2 - iAvg1;
+   absDiNow = abs(diNow);
+   diEnd    = 0.1 * diAcq;
+   If acq == 1
+      If acqT == 0
+         If acqN == 0
+            If camp2 == 0
+              If absDiNow < diEnd
+               acq = 0;
+               tAcq = tDays;
+               dvAcq1 = dvT1 + dvN1;
+               dvAcq2 = dvT2 + dvN2;
+               dvAcqTot = dvAcq1 + dvAcq2;
+              EndIf;
+            EndIf;
+         EndIf;
+      EndIf;
+   EndIf;
+
+   % Statistics (compliance is counted after the acquisition)
+   If acq == 0
    If Trel < TMin
       TMin = Trel;
    EndIf;
@@ -642,6 +712,7 @@ While finished == 0
    EndIf;
    If ANamp > 220
       nOutN = nOutN + 1;
+   EndIf;
    EndIf;
 
    %------------------------------------------------------------
@@ -709,9 +780,17 @@ While finished == 0
             doRel = 1;
          EndIf;
       Else
-         If Trel > TCenter
+         TStopUp = TCenter;
+         If acqT == 1
+            TStopUp = TCenter - TLeadAcq;
+         EndIf;
+         If Trel > TStopUp
             relMode = 0;
             doRel = 1;
+            If acqT == 1
+               acqT = 0;
+               zeroA = 1;
+            EndIf;
          EndIf;
       EndIf;
    EndIf;
@@ -720,6 +799,9 @@ While finished == 0
    EndIf;
    If relMode > 0
       TdotDes = VdT;
+      If acqT == 1
+         TdotDes = VAcq;
+      EndIf;
    EndIf;
    dTe = TdotDes - TdotM;
    absTe = abs(dTe);
@@ -739,6 +821,10 @@ While finished == 0
       If dACmd < -0.2
          dACmd = -0.2;
       EndIf;
+   EndIf;
+   If zeroA == 1
+      dACmd = 0;
+      zeroA = 0;
    EndIf;
    Tprev     = Trel;
    CyclePrev = CycleSecs;
@@ -814,21 +900,46 @@ While finished == 0
    eOm   = dRaanDeg - dRaan;
    eOmRel = 0.25 * eOmTol;
    absEo = abs(eOm);
-   If diCmd == 0
-      If absEo > eOmTol
-         nOmEv = nOmEv + 1;
-         diCmd = diBias;
-         If eOm > 0
-            diCmd = -diBias;
-         EndIf;
+   If acqN == 1
+      % Node acquisition: Sat2 is held diAcq above Sat1 so that its node runs ahead.
+      % The offset is removed again (taking diNow/diMax cycles, during which the node
+      % keeps drifting) as soon as the offset predicted for the end of that ramp
+      % reaches the target. The slow trim below removes what is left.
+      vCircA = sqrt(muE / aAvg2) * 1000;
+      diMaxA = radToDeg((2 / PiC) * (fMax2 / vCircA) * CycleSecs);
+      diNow  = iAvg2 - iAvg1;
+      tRampD = (diNow / diMaxA) * (CycleSecs / 86400);
+      dFut   = kOm * diNow * (0.5 * tRampD + 0.5);
+      dPred  = eOm + dFut;
+      diCmd  = diAcq;
+      If dPred > 0
+         acqN  = 0;
+         diCmd = 0;
       EndIf;
    Else
-      If absEo < eOmRel
-         diCmd = 0;
+      If diCmd == 0
+         If absEo > eOmTol
+            nOmEv = nOmEv + 1;
+            diCmd = diBias;
+            If eOm > 0
+               diCmd = -diBias;
+            EndIf;
+         EndIf;
+      Else
+         If absEo < eOmRel
+            diCmd = 0;
+         EndIf;
+      EndIf;
+   EndIf;
+   % The absolute (sun-synchronous) inclination hold starts after the acquisition
+   useAbs = 0;
+   If HoldSSO == 1
+      If acq == 0
+         useAbs = 1;
       EndIf;
    EndIf;
    iTgt2  = iRef + diCmd;
-   If HoldSSO == 0
+   If useAbs == 0
       iTgt2 = iAvg1 + diCmd;
    EndIf;
    diErr1 = iAvg1 - iRef;
@@ -849,7 +960,7 @@ While finished == 0
    aimSign = 0;
    If camp1 == 0
       If camp2 == 0
-         If HoldSSO == 1
+         If useAbs == 1
             If absDi1 > iDead
                startC = 1;
                aimSign = 1;
@@ -877,7 +988,7 @@ While finished == 0
       EndIf;
    EndIf;
    If startC == 1
-      If HoldSSO == 1
+      If useAbs == 1
          camp1  = 1;
          camp2  = 1;
          diRem1 = -diErr1 + aimSign * iAim;
@@ -942,7 +1053,7 @@ While finished == 0
    %------------------------------------------------------------
    %  6. Log
    %------------------------------------------------------------
-   Report DailyReport tDays uNow1 aAvg1 aAvg2 iAvg1 iAvg2 raanM1 raanM2 eM1 eM2 Rrel Trel Nrel Rng ANamp dACmd TdotM diCmd dutyT1 dutyT2 dutyN1 dutyN2 dvT1 dvN1 dvT2 dvN2 mass1 mass2 CycleSecs;
+   Report DailyReport tDays uNow1 aAvg1 aAvg2 iAvg1 iAvg2 raanM1 raanM2 eM1 eM2 Rrel Trel Nrel Rng ANamp dACmd TdotM diCmd dutyT1 dutyT2 dutyN1 dutyN2 dvT1 dvN1 dvT2 dvN2 mass1 mass2 CycleSecs acq;
 
    % The last pass (all orbits done) only measures and logs.
    If orbDone >= MissionOrbits
@@ -1125,3 +1236,4 @@ dutySumT2 = dutySumT2 / nCyc;
 Report SummaryReport MissionDays tDays nCyc dvT1 dvN1 dvT2 dvN2 dvTot dvRkt1 dvRkt2 mProp1 mProp2;
 Report SummaryReport dutySumT1 dutyMaxT1 dutySumT2 dutyMaxT2 campCyc1 campCyc2 dAMax1 dAMax2 nRel nOmEv;
 Report SummaryReport TMin TMax ANMin ANMax RngMin nOutT nOutN epMax;
+Report SummaryReport tAcq dvAcq1 dvAcq2 dvAcqTot;

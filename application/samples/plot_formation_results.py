@@ -143,6 +143,15 @@ class Run:
         self.dv_final = {s: {c: float(v[-1]) for c, v in self.dv[s].items()}
                          for s in (1, 2)}
         self.dv_total = sum(v for s in (1, 2) for v in self.dv_final[s].values())
+        # Acquisition (both satellites start at the same position): rows with
+        # acq = 1 are the phasing manoeuvre, compliance is judged after it.
+        self.acq = d["acq"] if "acq" in d else np.zeros(len(self.t))
+        after = np.where(self.acq < 0.5)[0]
+        self.i_ops = int(after[0]) if after.size else len(self.t) - 1
+        self.t_acq = float(self.t[self.i_ops]) if self.i_ops > 0 else 0.0
+        self.dv_acq = {s: {c: float(v[self.i_ops]) if self.i_ops > 0 else 0.0
+                           for c, v in self.dv[s].items()} for s in (1, 2)}
+        self.dv_acq_total = sum(v for s in (1, 2) for v in self.dv_acq[s].values())
         self.prop_g = {1: (d["mass1"][0] - d["mass1"]) * 1000,
                        2: (d["mass2"][0] - d["mass2"]) * 1000}
         # relative geometry
@@ -220,8 +229,18 @@ def sat_col(s):
     return col(SAT_COLOR[s])
 
 
+def shade_acq(ax, run):
+    """Grey span over the acquisition (both satellites start at the same place)."""
+    if run.i_ops > 0:
+        ax.axvspan(run.dates[0], run.dates[run.i_ops], color=C["muted"], alpha=0.13,
+                   lw=0, zorder=0)
+        ax.text(run.dates[run.i_ops], 0.03, "acquisition ends ", ha="right", va="bottom",
+                transform=ax.get_xaxis_transform(), fontsize=7.5, color=C["ink2"])
+
+
 def year_axis(ax, run, show_labels=True):
     import matplotlib.dates as mdates
+    shade_acq(ax, run)
     ax.xaxis.set_major_locator(mdates.YearLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     ax.set_xlim(run.dates[0], run.dates[-1])
@@ -305,7 +324,8 @@ def finish(fig, path, show):
 # ----------------------------------------------------------------------------
 def compliance(run):
     a = run.args
-    T = run.T
+    i0 = run.i_ops                  # compliance is judged after the acquisition
+    T = run.T[i0:]
     out = {}
     inside = (T >= a.t_min) & (T <= a.t_max)
     out["T_min"], out["T_max"] = float(np.nanmin(T)), float(np.nanmax(T))
@@ -313,14 +333,14 @@ def compliance(run):
     out["T_in_frac"] = float(inside.mean())
     out["T_ok"] = bool(inside.all())
     lo, hi = a.n_amp * (1 - a.n_tol), a.n_amp * (1 + a.n_tol)
-    AN = run.AN
+    AN = run.AN[i0:]
     ok = ~np.isnan(AN)
     n_in = (AN >= lo) & (AN <= hi)
     out["AN_min"], out["AN_max"] = float(np.nanmin(AN)), float(np.nanmax(AN))
     out["AN_in_frac"] = float(n_in[ok].mean())
     out["AN_ok"] = bool(n_in[ok].all())
     out["AN_lo"], out["AN_hi"] = lo, hi
-    out["rng_min"] = float(run.rng.min())
+    out["rng_min"] = float(run.rng[i0:].min())
     out["rng_ok"] = out["rng_min"] >= a.min_range
     out["ltan_max"] = float(np.abs(run.ltan_dev[1]).max())
     out["inc_change"] = float(run.inc[1][-2] - run.inc[1][0])
@@ -351,6 +371,9 @@ def fig_compliance(run, comp, outdir, show):
     status_chip(fig, 0.085, 0.851, comp["rng_ok"],
                 f"Closest approach {comp['rng_min']:.0f} km "
                 f"(minimum allowed {a.min_range:.0f} km)")
+    if run.i_ops > 0:
+        fig.text(0.9, 0.851, f"judged after the acquisition (day {run.t_acq:.0f})",
+                 color=C["ink2"], fontsize=8.5, ha="right", va="center")
 
     ax = axs[0]
     band(ax, a.t_min, a.t_max, "requirement")
@@ -360,6 +383,7 @@ def fig_compliance(run, comp, outdir, show):
     ax.set_ylabel("Along-track T (km)")
     ax.set_title("Along-track separation")
     ax.set_ylim(min(0, run.T.min() * 1.05), max(a.t_max * 1.08, run.T.max() * 1.05))
+    shade_acq(ax, run)
     end_label(ax, run, run.T[-1], f"{run.T[-1]:.0f}", col(0))
 
     ax = axs[1]
@@ -371,6 +395,9 @@ def fig_compliance(run, comp, outdir, show):
     ax.set_title("Normal separation amplitude  (a·√(Δi² + (sin i·ΔΩ)²))")
     span = max(comp["AN_max"] - a.n_amp, a.n_amp - comp["AN_min"], a.n_amp * a.n_tol)
     ax.set_ylim(a.n_amp - 1.5 * span, a.n_amp + 1.5 * span)
+    if run.i_ops > 0:               # show the build-up from zero as well
+        ax.set_ylim(0, a.n_amp * 1.15)
+    shade_acq(ax, run)
     last = np.where(~np.isnan(run.AN))[0][-1]
     ax.plot([run.dates[last]], [run.AN[last]], "o", ms=5, color=col(0),
             mec=C["surface"], mew=1.5, clip_on=False, zorder=5)
@@ -380,7 +407,7 @@ def fig_compliance(run, comp, outdir, show):
     ax = axs[2]
     ax.plot(run.dates, run.rng, color=col(0), lw=1.6)
     hline(ax, a.min_range, f"minimum allowed {a.min_range:.0f} km", color=C["crit"])
-    imin = int(np.argmin(run.rng))
+    imin = run.i_ops + int(np.argmin(run.rng[run.i_ops:]))
     ax.plot([run.dates[imin]], [run.rng[imin]], "o", ms=6, color=col(0),
             mec=C["surface"], mew=1.5, zorder=5)
     late = imin > 0.7 * len(run.rng)
@@ -411,7 +438,9 @@ def fig_dv(run, outdir, show):
              f"Sat2 {sum(run.dv_final[2].values()):.1f} m/s before margin)",
              fontsize=10, color=C["ink"], ha="left")
     fig.text(0.08, 0.895, "tangential = altitude + along-track control;  normal = "
-             "inclination / node control", fontsize=9, color=C["ink2"], ha="left")
+             "inclination / node control" + (
+                 f";  acquisition (days 0–{run.t_acq:.0f}) = {run.dv_acq_total:.1f} m/s"
+                 if run.i_ops > 0 else ""), fontsize=9, color=C["ink2"], ha="left")
 
     # (a) stacked bars per satellite + formation
     ax = fig.add_subplot(gs[0, 0])
@@ -775,11 +804,30 @@ def summary_text(run, comp):
     w(f"| **Formation** | {tt:.2f} | {nn:.2f} | **{tt+nn:.2f}** | "
       f"**{(tt+nn)*(1+a.margin):.2f}** | |")
     w("")
+    if run.i_ops > 0:
+        w("")
+        w(f"| phase | Sat1 | Sat2 | formation | with %d %% margin |" % round(a.margin * 100))
+        w("|---|---:|---:|---:|---:|")
+        a1 = sum(run.dv_acq[1].values())
+        a2 = sum(run.dv_acq[2].values())
+        o1 = sum(run.dv_final[1].values()) - a1
+        o2 = sum(run.dv_final[2].values()) - a2
+        for name, x1, x2 in ((f"acquisition, days 0–{run.t_acq:.0f}", a1, a2),
+                             ("operations after it", o1, o2)):
+            w(f"| {name} | {x1:.2f} | {x2:.2f} | {x1+x2:.2f} | "
+              f"{(x1+x2)*(1+a.margin):.2f} |")
+        w("")
+        w("Both satellites start at the same position; the acquisition builds the "
+          "along-track and normal separation and is part of the totals above.")
+    w("")
     w("Per mission year (formation, m/s): " + ", ".join(
         f"Y{i+1} {r['tang']+r['norm']:.1f}" for i, r in enumerate(run.per_year_dv())))
     w("")
     w("## Compliance")
     w("")
+    if run.i_ops > 0:
+        w(f"(Compliance is judged from day {run.t_acq:.0f}, after the acquisition.)")
+        w("")
     w(f"- Along-track {comp['T_min']:.0f}–{comp['T_max']:.0f} km "
       f"(limits {a.t_min:.0f}–{a.t_max:.0f}): "
       f"{'PASS' if comp['T_ok'] else 'FAIL'}, margin {comp['T_margin']:.0f} km, "
