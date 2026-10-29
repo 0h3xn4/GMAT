@@ -641,7 +641,7 @@ LaunchDelayDays = 0;     % days after 01 Jan 2027
 % the solar activity (EolFM) until re-entry (HReentry) or LifeMaxDays.
 EolOn       = 1;         % 0 = stop at the end of the mission
 dAClear     = 5;         % km, AD10: minimum SMA drop to clear the operational orbit
-HDisp       = 460;       % km, mean altitude of the disposal orbit (natural decay 4.4 years at worst, see the lifetime sweep)
+HDisp       = 450;       % km, mean altitude of the disposal orbit (natural decay 4.7 years at worst including the thrusting descent, see the lifetime sweep)
 CdEol       = 2.2;       % AD10: Cd for the end-of-life operations
 LifeMaxDays = 1826;      % days, 5 years (ESSB-ST-U-007 5.4.2.3)
 HReentry    = 120;       % km, altitude taken as re-entry
