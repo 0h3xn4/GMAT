@@ -128,23 +128,26 @@
 %   HoldSSO = 1; 5 kg tanks). The totals include the acquisition: 179 days, 46.2
 %   m/s for the formation at +2 sigma (23.1 per satellite; 44.8 at the nominal
 %   activity). The inclination ramps are thrust limited: with diAcq = 0.05 deg it
-%   takes 285 days and 25.6 m/s, with 0.20 deg 192 days and 85.6 m/s (nominal).
+%   takes 285 days and 25.6 m/s (nominal); 0.20 deg takes 192 days but overshoots the
+%   normal amplitude (about 300 km), so it is not usable at 1 mN.
 %   End of life, each satellite, not in the figures above: clearance 2.7 + disposal
-%   55.5 m/s down to 450 km, 0.85 kg of propellant. At 1 mN the descent lasts about
+%   55.6 m/s down to 450 km, 0.85 kg of propellant. At 1 mN the descent lasts about
 %   270 days; the natural decay from 450 km then takes 1.4 years (2.1 years from the
 %   end of life; limit 5 years; 4.7 years for the worst of 11 end-of-life epochs,
 %   see formation_eol_lifetime.py --descent-days 270). 460 km would take 5.2 years
 %   at worst.
 %   Launch delay (HoldSSO = 0, +2 sigma, formation delta-V without end of life):
 %   1 year 61.0, 2 years 76.2, 3 years 111.1, 4 years 153.0, 5 years 187.1 m/s.
-%   After the acquisition the along-track separation stays within 322..606 km (limit
-%   50..1000 km) and the N amplitude within 198..208 km in all cases. The prograde
-%   thruster fires 1 to 5 % of the time (up to 34 % for a launch 5 years late).
+%   After the acquisition the along-track separation drifts from about 580 km down to
+%   the 350 km limit (day 1502), the drift is reversed once and T ends at 673 km
+%   (350..673 km in all cases; requirement 300..800 km). The N amplitude stays within
+%   198..208 km. The prograde thruster fires 0.6 to 5 % of the time (up to 34 % for a
+%   launch 5 years late).
 %   With HoldSSO = 0 the inclination falls from 97.65 to 97.47 deg (Sun and Moon)
 %   and the LTAN of the pair drifts from 10:30 to about 09:12 over the 5 years; with
 %   HoldSSO = 1 the LTAN of the pair centre stays within 0.9 min. Without any
 %   control the same pair (started in its slots, ControlOn = 0) loses 7.8 km of
-%   altitude in year 1, leaves the along-track corridor after 152 days and the
+%   altitude in year 1, leaves the along-track corridor (300..800 km) after 96 days and the
 %   N-amplitude band after 702 days, and the LTAN slips by about 30 min.
 
 %----------------------------------------
