@@ -95,7 +95,7 @@ def run_case(args, alt, year):
     tag = f"life_{alt:g}_{year}"
     out = tag + ".txt"
     script = TEMPLATE.format(
-        epoch=f"31 Dec {year} 00:00:00.000", sma=6378.1363 + alt, inc=args.inc,
+        epoch=f"{args.epoch_date} {year} 00:00:00.000", sma=6378.1363 + alt, inc=args.inc,
         mass=args.mass, cd=args.cd, area=args.area, pct=args.percentile,
         out=out, maxdays=args.max_days)
     gmat = os.path.abspath(args.gmat_bin)
@@ -125,6 +125,12 @@ def main():
                     help="mean altitudes of the disposal orbit, km")
     ap.add_argument("--first-year", type=int, default=2031,
                     help="first end-of-life epoch, 31 Dec of this year")
+    ap.add_argument("--epoch-date", default="31 Dec",
+                    help="day and month of the start epoch, e.g. 07 Sep when the thrusting "
+                         "descent lasts 250 days after the end of life on 31 Dec")
+    ap.add_argument("--descent-days", type=float, default=0.0,
+                    help="duration of the thrusting descent, added to every lifetime "
+                         "because ESSB counts from the end of life")
     ap.add_argument("--years", type=int, default=12,
                     help="number of start epochs, one per year (a solar cycle is ~11 years)")
     ap.add_argument("--area", type=float, default=4.5, help="drag area, m^2")
@@ -143,18 +149,19 @@ def main():
         res = list(ex.map(lambda c: run_case(args, *c), cases))
     table = {c: r for c, r in zip(cases, res)}
 
-    print("Orbit lifetime in years (start 31 Dec of the year, Cd %.1f, %.1f m^2, "
-          "%s solar activity); limit 5 years" % (args.cd, args.area, args.percentile))
+    print("Orbit lifetime in years (start %s of the year, Cd %.1f, %.1f m^2, "
+          "%s solar activity, plus %.0f days of descent); limit 5 years"
+          % (args.epoch_date, args.cd, args.area, args.percentile, args.descent_days))
     print("%-10s" % "year" + "".join("%9.0f km" % h for h in args.altitudes))
     for y in years:
         print("%-10d" % y + "".join(
-            "%12.2f" % (table[(h, y)] / 365.25) for h in args.altitudes))
+            "%12.2f" % ((table[(h, y)] + args.descent_days) / 365.25) for h in args.altitudes))
     print("%-10s" % "worst" + "".join(
-        "%12.2f" % (max(table[(h, y)] for y in years) / 365.25) for h in args.altitudes))
+        "%12.2f" % ((max(table[(h, y)] for y in years) + args.descent_days) / 365.25) for h in args.altitudes))
     print("%-10s" % "start 1" + "".join(
-        "%12.2f" % (table[(h, years[0])] / 365.25) for h in args.altitudes))
+        "%12.2f" % ((table[(h, years[0])] + args.descent_days) / 365.25) for h in args.altitudes))
     ok = [h for h in args.altitudes
-          if max(table[(h, y)] for y in years) < 5 * 365.25]
+          if max(table[(h, y)] for y in years) + args.descent_days < 5 * 365.25]
     print("altitudes meeting the limit for every start epoch:", ok or "none")
 
 

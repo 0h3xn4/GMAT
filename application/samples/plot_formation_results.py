@@ -911,7 +911,18 @@ def esa_checks(run):
             life = s[f"life{sat}"]
             out.append((f"Orbit lifetime after disposal, Sat{sat}",
                         life / 365.25, "years"))
-        ok = all(s[f"life{k}"] < 1826 and s.get(f"hEnd{k}", 0) <= 125 for k in (1, 2))
+        # the lifetime counts from the end of life: add the thrusting descent
+        # (dv / (F/m)), estimated with the mean mass of the satellite
+        args = run.args
+        m_eol = 399.5
+        desc = {k: (s[f"dvClr{k}"] + s[f"dvDisp{k}"]) / (args.thrust / m_eol * 86400)
+                if "dvClr1" in s else 0.0 for k in (1, 2)}
+        if "dvClr1" in s:
+            for sat in (1, 2):
+                out.append((f"Thrusting descent, Sat{sat} (estimate)", desc[sat], "days"))
+                out.append((f"Total time from the end of life to re-entry, Sat{sat}",
+                            (desc[sat] + s[f"life{sat}"]) / 365.25, "years"))
+        ok = all(desc[k] + s[f"life{k}"] < 1826 and s.get(f"hEnd{k}", 0) <= 125 for k in (1, 2))
         out.append(("Natural decay < 5 years from the end of life (5.4.2.3.a.1)",
                     "PASS" if ok else "FAIL", ""))
         out.append(("Disposal orbit mean altitude", (s["aDispT"] - 6378.1363), "km"))
