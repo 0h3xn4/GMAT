@@ -1049,8 +1049,8 @@ def main(argv=None):
     ap.add_argument("--start-date", default="2027-01-01",
                     help="mission start (YYYY-MM-DD), used for the time axis and "
                          "LTAN; must match the Epoch in the GMAT script")
-    ap.add_argument("--t-min", type=float, default=50, help="along-track minimum, km")
-    ap.add_argument("--t-max", type=float, default=1000, help="along-track maximum, km")
+    ap.add_argument("--t-min", type=float, default=300, help="along-track minimum, km")
+    ap.add_argument("--t-max", type=float, default=800, help="along-track maximum, km")
     ap.add_argument("--n-amp", type=float, default=200, help="normal amplitude, km")
     ap.add_argument("--n-tol", type=float, default=0.10,
                     help="allowed fractional error of the normal amplitude")

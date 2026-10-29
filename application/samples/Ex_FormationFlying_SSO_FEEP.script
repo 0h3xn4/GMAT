@@ -8,7 +8,7 @@
 %  throttled with the thruster DutyCycle and held for a whole control cycle.
 %
 %  FORMATION REQUIREMENT (RTN frame centred on Sat1, Sat2 relative to Sat1)
-%     Along-track (T) separation :  50 ... 1000 km
+%     Along-track (T) separation :  300 ... 800 km
 %     Normal (N) separation      :  200 km (amplitude, see below)
 %
 %  The normal separation is created with a RAAN (LTAN) offset between the two
@@ -102,7 +102,7 @@
 %        dvTot               : total for the formation, m/s
 %        TMin/TMax           : along-track separation extremes, km
 %        ANMin/ANMax         : normal-separation amplitude extremes, km
-%        nOutT/nOutN         : cycles outside 50..1000 km / 180..220 km
+%        nOutT/nOutN         : cycles outside 300..800 km / 180..220 km
 %        epMax               : largest epoch difference between the satellites, s
 %        tAcq                : day the acquisition ended (0 if AcqOn = 0)
 %        dvAcqT/N1,2         : delta-V used up to then (included in dvT/dvN)
@@ -590,10 +590,10 @@ raanRef = 258.7256;      % deg, LTAN 10:30 at 01 Jan 2027 (centre of the pair)
 
 % Formation requirement (Sat2 relative to Sat1, RTN)
 NAmp    = 200;           % km, normal separation amplitude
-T0      = 525;           % km, initial along-track separation (mid corridor)
-TLow    = 100;           % km, reverse drift below this (requirement: 50)
-THigh   = 950;           % km, reverse drift above this (requirement: 1000)
-TCenter = 525;           % km, stop the reversal drift when back at this value
+T0      = 550;           % km, initial along-track separation (mid corridor)
+TLow    = 350;           % km, reverse drift below this (requirement: 300)
+THigh   = 750;           % km, reverse drift above this (requirement: 800)
+TCenter = 550;           % km, stop the reversal drift when back at this value
 VdT     = 1.5;           % km/day, drift rate used to come back from a limit
 VtolT   = 0.4;           % km/day, tolerance on the commanded drift rate
 kappaT  = 0.3;           % fraction of the needed SMA change commanded per cycle
@@ -620,7 +620,7 @@ diBias  = 0.004;         % deg, differential inclination used to steer the RAAN 
 AcqOn    = 1;            % 1 = both satellites start at the same position and the formation
                          %     is built first by a phasing manoeuvre; 0 = start in formation
 VAcq     = 10;           % km/day, along-track drift rate during the acquisition
-TLeadAcq = 25;           % km, stop the drift this far before TCenter (it decays with drag)
+TLeadAcq = 80;           % km, stop the drift this far before TCenter (the drift decays with drag and overshoots by about this much)
 diAcq    = 0.1;          % deg, inclination offset of Sat2 over Sat1 that drives the RAAN
                          %      offset apart (Sat1 goes down and Sat2 up by half of it)
 
@@ -863,10 +863,10 @@ While finished == 0
    If Rng < RngMin
       RngMin = Rng;
    EndIf;
-   If Trel < 50
+   If Trel < 300
       nOutT = nOutT + 1;
    EndIf;
-   If Trel > 1000
+   If Trel > 800
       nOutT = nOutT + 1;
    EndIf;
    If ANamp < 180
