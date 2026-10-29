@@ -23,7 +23,7 @@
 %     560 km circular SSO, LTAN 10:30, start 01 Jan 2027, 5 years (1826 days)
 %     2 identical 400 kg satellites (395 kg dry + 5 kg propellant), Cd 3.0,
 %     drag area 4.5 m^2 each (SRP area 4.5 m^2, Cr 1.3)
-%     FEEP: 4 mN per thruster (a cluster of four 1 mN heads), Isp 3000 s, one
+%     FEEP: 1 mN maximum thrust per thruster, Isp 2800 s, one
 %     prograde and two out-of-plane (+N / -N) thrusters per satellite, power
 %     never limits thrust
 %     Gravity 8x8, Sun + Moon, SRP, NRLMSISE-00 drag with the Schatten (MSFC)
@@ -113,7 +113,7 @@
 %        mPropEol, dvRktEol  : propellant and rocket-equation delta-V of the end of life
 %     The Daily file has a last column acq (1 while the acquisition runs).
 %
-%  REFERENCE RESULTS (GMAT R2026a, 560 km, 400 kg, 4 mN, Cd 3.0, 4.5 m^2, 5 years,
+%  REFERENCE RESULTS (STALE: computed with 4 mN and Isp 3000 s; being re-run for 1 mN and 2800 s; GMAT R2026a, 560 km, 400 kg, Cd 3.0, 4.5 m^2, 5 years,
 %  start 01 Jan 2027 with both satellites at the same point, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
 %   HoldSSO = 0 (default: the orbit plane is allowed to drift)
@@ -241,8 +241,8 @@ FeepT1.GravitationalAccel = 9.80665;
 FeepT1.ThrustModel        = ConstantThrustAndIsp;
 FeepT1.MaximumUsablePower = 0.5;
 FeepT1.MinimumUsablePower = 0.001;
-FeepT1.ConstantThrust     = 0.004;
-FeepT1.Isp                = 3000;
+FeepT1.ConstantThrust     = 0.001;
+FeepT1.Isp                = 2800;
 
 Create ElectricThruster FeepNp1;
 FeepNp1.CoordinateSystem   = Local;
@@ -261,8 +261,8 @@ FeepNp1.GravitationalAccel = 9.80665;
 FeepNp1.ThrustModel        = ConstantThrustAndIsp;
 FeepNp1.MaximumUsablePower = 0.5;
 FeepNp1.MinimumUsablePower = 0.001;
-FeepNp1.ConstantThrust     = 0.004;
-FeepNp1.Isp                = 3000;
+FeepNp1.ConstantThrust     = 0.001;
+FeepNp1.Isp                = 2800;
 
 Create ElectricThruster FeepNm1;
 FeepNm1.CoordinateSystem   = Local;
@@ -281,8 +281,8 @@ FeepNm1.GravitationalAccel = 9.80665;
 FeepNm1.ThrustModel        = ConstantThrustAndIsp;
 FeepNm1.MaximumUsablePower = 0.5;
 FeepNm1.MinimumUsablePower = 0.001;
-FeepNm1.ConstantThrust     = 0.004;
-FeepNm1.Isp                = 3000;
+FeepNm1.ConstantThrust     = 0.001;
+FeepNm1.Isp                = 2800;
 
 % Satellite 2: identical thruster set
 Create ElectricThruster FeepT2;
@@ -299,8 +299,8 @@ FeepT2.GravitationalAccel = 9.80665;
 FeepT2.ThrustModel        = ConstantThrustAndIsp;
 FeepT2.MaximumUsablePower = 0.5;
 FeepT2.MinimumUsablePower = 0.001;
-FeepT2.ConstantThrust     = 0.004;
-FeepT2.Isp                = 3000;
+FeepT2.ConstantThrust     = 0.001;
+FeepT2.Isp                = 2800;
 
 Create ElectricThruster FeepNp2;
 FeepNp2.CoordinateSystem   = Local;
@@ -319,8 +319,8 @@ FeepNp2.GravitationalAccel = 9.80665;
 FeepNp2.ThrustModel        = ConstantThrustAndIsp;
 FeepNp2.MaximumUsablePower = 0.5;
 FeepNp2.MinimumUsablePower = 0.001;
-FeepNp2.ConstantThrust     = 0.004;
-FeepNp2.Isp                = 3000;
+FeepNp2.ConstantThrust     = 0.001;
+FeepNp2.Isp                = 2800;
 
 Create ElectricThruster FeepNm2;
 FeepNm2.CoordinateSystem   = Local;
@@ -339,8 +339,8 @@ FeepNm2.GravitationalAccel = 9.80665;
 FeepNm2.ThrustModel        = ConstantThrustAndIsp;
 FeepNm2.MaximumUsablePower = 0.5;
 FeepNm2.MinimumUsablePower = 0.001;
-FeepNm2.ConstantThrust     = 0.004;
-FeepNm2.Isp                = 3000;
+FeepNm2.ConstantThrust     = 0.001;
+FeepNm2.Isp                = 2800;
 
 
 % Retrograde thrusters, used ONLY for the end-of-life clearance and disposal
@@ -359,8 +359,8 @@ FeepR1.GravitationalAccel = 9.80665;
 FeepR1.ThrustModel        = ConstantThrustAndIsp;
 FeepR1.MaximumUsablePower = 0.5;
 FeepR1.MinimumUsablePower = 0.001;
-FeepR1.ConstantThrust     = 0.004;
-FeepR1.Isp                = 3000;
+FeepR1.ConstantThrust     = 0.001;
+FeepR1.Isp                = 2800;
 Create ElectricThruster FeepR2;
 FeepR2.CoordinateSystem   = Local;
 FeepR2.Origin             = Earth;
@@ -375,8 +375,8 @@ FeepR2.GravitationalAccel = 9.80665;
 FeepR2.ThrustModel        = ConstantThrustAndIsp;
 FeepR2.MaximumUsablePower = 0.5;
 FeepR2.MinimumUsablePower = 0.001;
-FeepR2.ConstantThrust     = 0.004;
-FeepR2.Isp                = 3000;
+FeepR2.ConstantThrust     = 0.001;
+FeepR2.Isp                = 2800;
 
 %----------------------------------------
 %---------- Burns
@@ -603,8 +603,8 @@ VtolT   = 0.4;           % km/day, tolerance on the commanded drift rate
 kappaT  = 0.3;           % fraction of the needed SMA change commanded per cycle
 
 % FEEP assumptions (ThrustN must equal ConstantThrust above, Isp0 the Isp)
-ThrustN = 0.004;         % N per thruster (a cluster of four 1 mN FEEP heads)
-Isp0    = 3000;          % s
+ThrustN = 0.001;         % N per thruster (1 mN FEEP, maximum thrust)
+Isp0    = 2800;          % s
 g0      = 9.80665;       % m/s^2, standard gravity (AD10), same as the thrusters' GravitationalAccel
 
 % Controller tuning

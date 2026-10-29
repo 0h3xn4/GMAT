@@ -1063,8 +1063,8 @@ def main(argv=None):
     ap.add_argument("--tank-kg", type=float, default=5.0,
                     help="maximum propellant load of each tank, kg (AD10 5.8)")
     ap.add_argument("--eta", type=float, default=1.0, help="thruster efficiency (AD10 5.11)")
-    ap.add_argument("--isp", type=float, default=3000, help="thruster Isp, s")
-    ap.add_argument("--thrust", type=float, default=0.004,
+    ap.add_argument("--isp", type=float, default=2800, help="thruster Isp, s")
+    ap.add_argument("--thrust", type=float, default=0.001,
                     help="thrust per thruster, N (for the firing-time estimate)")
     ap.add_argument("--theme", choices=["light", "dark"], default="light")
     ap.add_argument("--show", action="store_true", help="open the figures")
