@@ -113,43 +113,39 @@
 %        mPropEol, dvRktEol  : propellant and rocket-equation delta-V of the end of life
 %     The Daily file has a last column acq (1 while the acquisition runs).
 %
-%  REFERENCE RESULTS (STALE: computed with 4 mN and Isp 3000 s; being re-run for 1 mN and 2800 s; GMAT R2026a, 560 km, 400 kg, Cd 3.0, 4.5 m^2, 5 years,
+%  REFERENCE RESULTS (GMAT R2026a, 560 km, 400 kg, 1 mN, Isp 2800 s, Cd 3.0, 4.5 m^2, 5 years,
 %  start 01 Jan 2027 with both satellites at the same point, delta-V in m/s)
 %                              Sat1 tang  Sat1 norm  Sat2 tang  Sat2 norm  Formation
 %   HoldSSO = 0 (default: the orbit plane is allowed to drift)
-%     +2 sigma, 95th percentile      9.6       22.4        9.6       22.4       63.9
-%     Schatten nominal               7.0       22.4        7.0       22.4       58.8
+%     +2 sigma, 95th percentile      9.6       22.2        9.6       22.2       63.6
+%     Schatten nominal               7.0       22.2        7.0       22.2       58.4
 %   HoldSSO = 1 (sun-synchronous inclination and LTAN held)
-%     +2 sigma, 95th percentile      9.7       53.2        9.7       51.5      124.1
-%     Schatten nominal               7.1       53.1        7.1       51.4      118.7
+%     +2 sigma, 95th percentile      9.7       53.4        9.7       51.7      124.5
+%     Schatten nominal               7.1       53.4        7.1       51.8      119.3
 %   tang = altitude + along-track, norm = inclination / node control. Both satellites
 %   share the relative inclination changes, so they use the same delta-V and about
-%   the same propellant (0.43 / 0.44 kg with HoldSSO = 0, 0.85 / 0.83 kg with
-%   HoldSSO = 1; 5 kg tanks). The totals include the acquisition: 143 days, 45.5
-%   m/s for the formation at +2 sigma (22.7 per satellite; 44.3 at the nominal
-%   activity). With diAcq = 0.05 deg it takes 267 days and 25.3 m/s, with 0.20 deg
-%   90 days and 84.8 m/s (nominal).
+%   the same propellant (0.46 / 0.46 kg with HoldSSO = 0, 0.92 / 0.89 kg with
+%   HoldSSO = 1; 5 kg tanks). The totals include the acquisition: 179 days, 46.2
+%   m/s for the formation at +2 sigma (23.1 per satellite; 44.8 at the nominal
+%   activity). The inclination ramps are thrust limited: with diAcq = 0.05 deg it
+%   takes 285 days and 25.6 m/s, with 0.20 deg 192 days and 85.6 m/s (nominal).
 %   End of life, each satellite, not in the figures above: clearance 2.7 + disposal
-%   52.0 m/s down to 460 km, 0.74 kg of propellant, and a natural decay of 2.0
-%   years (limit 5 years; 4.35 years for the worst of the end-of-life epochs
-%   2031 ... 2041, see formation_eol_lifetime.py).
+%   55.5 m/s down to 450 km, 0.85 kg of propellant. At 1 mN the descent lasts about
+%   270 days; the natural decay from 450 km then takes 1.4 years (2.1 years from the
+%   end of life; limit 5 years; 4.7 years for the worst of 11 end-of-life epochs,
+%   see formation_eol_lifetime.py --descent-days 270). 460 km would take 5.2 years
+%   at worst.
 %   Launch delay (HoldSSO = 0, +2 sigma, formation delta-V without end of life):
-%   1 year 63.2, 2 years 76.5, 3 years 111.6, 4 years 153.4, 5 years 187.4 m/s.
-%   After the acquisition the along-track separation stays within 317..595 km (limit
-%   50..1000 km) and the N amplitude within 198..206 km in all cases.
+%   1 year 61.0, 2 years 76.2, 3 years 111.1, 4 years 153.0, 5 years 187.1 m/s.
+%   After the acquisition the along-track separation stays within 322..606 km (limit
+%   50..1000 km) and the N amplitude within 198..208 km in all cases. The prograde
+%   thruster fires 1 to 5 % of the time (up to 34 % for a launch 5 years late).
 %   With HoldSSO = 0 the inclination falls from 97.65 to 97.47 deg (Sun and Moon)
 %   and the LTAN of the pair drifts from 10:30 to about 09:12 over the 5 years; with
-%   HoldSSO = 1 the LTAN of the pair centre stays within 0.6 min. Without any
+%   HoldSSO = 1 the LTAN of the pair centre stays within 0.9 min. Without any
 %   control the same pair (started in its slots, ControlOn = 0) loses 7.8 km of
 %   altitude in year 1, leaves the along-track corridor after 152 days and the
 %   N-amplitude band after 702 days, and the LTAN slips by about 30 min.
-%
-%  Run time is about 40 min in GmatConsole: about 1 s per simulated day in
-%  operations (more during the acquisition), then the end-of-life lifetime check.
-%  Plots and a budget table from the output files: plot_formation_results.py
-%  (same folder), e.g.  python plot_formation_results.py <GMAT output folder>
-%  Set ControlOn = 0 for the uncontrolled (free-drift) reference case.
-%
 
 %----------------------------------------
 %---------- Spacecraft

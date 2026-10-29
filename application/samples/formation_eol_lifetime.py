@@ -8,10 +8,13 @@ asks for it: Cd 2.2 and the 50th percentile of the solar activity (6.2.g, AD10
 GMAT free-decay propagation per (altitude, start year) with GmatConsole and
 prints a table of lifetimes. The first altitude/year of the table is the
 disposal orbit and end-of-life epoch of Ex_FormationFlying_SSO_FEEP.script
-(HDisp, 31 Dec 2031); use it to choose HDisp.
+(HDisp, end of life 31 Dec 2031, decay starting after the thrusting descent); use it
+to choose HDisp. At 1 mN the descent lasts about 270 days: use --epoch-date "27 Sep"
+--descent-days 270 and --first-year 2032.
 
     python formation_eol_lifetime.py --gmat-bin /path/to/GMAT/bin/GmatConsole \\
-        --altitudes 460 480 500 520 --years 12 --jobs 4
+        --altitudes 440 450 460 --first-year 2032 --years 11 \\
+        --epoch-date "27 Sep" --descent-days 270 --jobs 4
 
 The mean altitude is that of the disposal orbit (circular, e = 0.0012). Area, mass
 and inclination default to the values of the script at the end of life.
